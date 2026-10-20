@@ -193,10 +193,11 @@ ENUM_SETTINGS = ["Trigger Source", "Trigger Response", "Gating Mode", "Trigger D
                  "Trigger Termination", "Trigger Coupling", "Photon Detection Mode"]
 
 
-def _set_enum(cam, attrs, name, label, retries=50, wait_s=0.1):
-    """Set an enum attribute by label. Retries only on PICam 'acquisition in progress';
-    falls back to the integer index. Returns (ok, error_text). Unlike
-    camera_control.set_enum_attr, the real error is kept so it can be printed."""
+def _set_enum(cam, attrs, name, label, retries=100, wait_s=0.1, nudge_every=10):
+    """Set an enum attribute by label. Retries only on PICam 'acquisition in progress'
+    (error 20, seen on this camera on 20 Oct for every trigger/gating setting), re-sending
+    stop_acquisition every `nudge_every` tries like camera_control.safe_set_attribute_value;
+    falls back to the integer index. Returns (ok, error_text)."""
     import camera_control as cc
     busy = None
     try:
@@ -204,13 +205,18 @@ def _set_enum(cam, attrs, name, label, retries=50, wait_s=0.1):
     except Exception:
         pass
     last = None
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
             cam.set_attribute_value(name, label)
             return True, None
         except Exception as e:
             last = e
             if busy is not None and getattr(e, "code", None) == busy:
+                if attempt and attempt % nudge_every == 0:
+                    try:
+                        cam.stop_acquisition()
+                    except Exception:
+                        pass
                 time.sleep(wait_s)
                 continue
             break
@@ -590,6 +596,8 @@ def match_warnings(run, dark):
     keys = ["gain", "gate_width_ns", "accumulations", "photon_mode", "photon_threshold"]
     if dark["meta"]["settings"]["kind"] == "dark":
         keys += ["gate_delay_ns", "trigger_source"]
+    elif dark["meta"]["settings"]["kind"] == "dark_offdelay":
+        keys += ["trigger_source"]
     out = [f"{k}: signal {a[k]} vs dark {b[k]}" for k in keys if a.get(k) != b.get(k)]
     if run["meta"]["roi"] != dark["meta"]["roi"]:
         out.append(f"roi: signal {run['meta']['roi']} vs dark {dark['meta']['roi']}")
@@ -653,6 +661,17 @@ def spot_masks(run, spot=None):
     if ap.sum() == 0 or ring.sum() < 20:
         raise ValueError(f"spot {spot} is too close to / outside the ROI {run['meta']['roi']}")
     return ap, ring
+
+
+def spot_contrast(run, spot=None, sigma=2.0):
+    """How compact and bright the spot is: peak of the 2 px-smoothed mean image inside the
+    aperture, above the ring median, in units of the ring's robust spread. A real beam gave ~40
+    (20 Oct); stray light / blocked arm gave ~3-4. Needs no background run."""
+    ap, ring = spot_masks(run, spot)
+    sm = gaussian_filter(crop(run, run["sum"]) / n_rd(run), sigma)
+    r = sm[ring]
+    spread = 1.4826 * np.median(np.abs(r - np.median(r)))
+    return float((sm[ap].max() - np.median(r)) / spread) if spread > 0 else np.inf
 
 
 def is_thresholded(run):
@@ -825,8 +844,10 @@ def plot_run(run, dark=None, threshold=None, spot=None, band=5, save_as=None):
     im = ax[0, 2].imshow(net, cmap="RdBu_r", vmin=-lim, vmax=lim, extent=(x0, x0 + size, y0 + size, y0))
     for rad, ls in ((SPOT_RADIUS_PX, "-"), (RING_PX[0], ":"), (RING_PX[1], ":")):
         ax[0, 2].add_patch(Circle((x0 + px, y0 + py), rad, fill=False, ec="k", lw=.8, ls=ls))
-    sub = (f"minus dark '{dark['meta']['settings']['label']}'" if dark is not None
-           else "minus frame median (NO dark frame)")
+    bgname = ("off-delay background" if dark is not None and dark["meta"]["settings"]["kind"] == "dark_offdelay"
+              else "dark")
+    sub = (f"minus {bgname} '{dark['meta']['settings']['label']}'" if dark is not None
+           else "minus frame median (no background run)")
     ax[0, 2].set_title(f"(c) ROI {sub}\nsum of {n} readouts; circle = spot, dotted = ring")
     ax[0, 2].set_xlabel("x (px)"); ax[0, 2].set_ylabel("y (px)")
     fig.colorbar(im, ax=ax[0, 2], label="net ADU (summed)")
@@ -847,7 +868,7 @@ def plot_run(run, dark=None, threshold=None, spot=None, band=5, save_as=None):
             if dv is not None:
                 ax[1, 0].hist(dv, bins=bins, histtype="step", lw=1.5, color="k",
                               weights=np.full(dv.size, 1 / max(len(dark["roi_stack"]), 1)),
-                              label=f"dark ({len(dark['roi_stack'])} readouts)")
+                              label=f"{bgname} ({len(dark['roi_stack'])} readouts)")
         if threshold is not None:
             ax[1, 0].axvline(threshold, color="C2", ls="--", label=f"threshold {threshold:g}")
         ax[1, 0].set_yscale("log")
@@ -878,9 +899,9 @@ def plot_run(run, dark=None, threshold=None, spot=None, band=5, save_as=None):
     m = run_metrics(run, dark, spot=(x0 + px, y0 + py), threshold=threshold)
     if dark is not None and "spot_z" in m:
         title += (f"\nspot (r = {SPOT_RADIUS_PX} px, ring-subtracted): {m['spot_net_adu_per_readout']:.3g} "
-                  f"net ADU per readout, {m['spot_z']:.1f} sigma above dark")
+                  f"net ADU per readout, {m['spot_z']:.1f} sigma above {bgname}")
         if "spot_hits_z" in m:
-            title += (f"  |  hits >= {threshold:g} ADU: {m['spot_hits_per_readout']:.2f} vs dark "
+            title += (f"  |  hits >= {threshold:g} ADU: {m['spot_hits_per_readout']:.2f} vs {bgname} "
                       f"{m['spot_dark_hits_per_readout']:.2f} per readout ({m['spot_hits_z']:.1f} sigma)")
         warn = match_warnings(run, dark)
         if warn:
@@ -1142,6 +1163,23 @@ def expected_counts(idler_khz=15.0, signal_khz=18.0, coinc_khz=1.5, signal_apd_e
                      "unheralded per readout": unh * accumulations,
                      "heralded fraction": p_herald / (p_herald + unh)})
     return pd.DataFrame(rows)
+
+
+def take_offdelay_background(cam, settings, shift_ns=5000.0, n_readouts=None, label=None):
+    """Background that needs nobody in the lab: identical settings, but the gate is moved
+    `shift_ns` later, away from the heralded photon. It still sees the unheralded light,
+    dark counts, pedestal and hot pixels, so (signal - this) is the HERALDED part only.
+    `settings` is a settings dict or a run (its settings are reused). Only valid when the
+    gate width is well below the shift; a 100 us gate cannot have an off-delay background."""
+    s = dict(settings["meta"]["settings"]) if isinstance(settings, dict) and "meta" in settings else dict(settings)
+    if float(s["gate_width_ns"]) >= shift_ns:
+        raise ValueError(f"gate width {fmt_ns(s['gate_width_ns'])} is not much shorter than the "
+                         f"shift {fmt_ns(shift_ns)}; the background window would overlap the signal window")
+    s.update(kind="dark_offdelay", gate_delay_ns=float(s["gate_delay_ns"]) + shift_ns,
+             label=label or f"{s['label']}_offdelay")
+    if n_readouts is not None:
+        s["n_readouts"] = int(n_readouts)
+    return take_run(cam, **{k: v for k, v in s.items() if k in DEFAULT_SETTINGS})
 
 
 def take_halves(cam, base, delay_ns, width_ns, label="ladder", **overrides):
