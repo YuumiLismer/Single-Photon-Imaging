@@ -22,9 +22,11 @@ test it on the camera, read the numbers and figures, change settings or code, re
   - `photon_hunt.py`: the full unattended search (see `--help`).
   - `trigger_rate_monitor.py`: live trigger rate from camera timing (see `--help`).
   - `troubleshoot.ipynb`: the "Findings so far" cell and section notes give the background.
-- Data: runs are saved to `C:\Users\ReschLab\Desktop\HOI_freshstaret\data\raw\troubleshoot\`.
-  Figures go to `...\data\processed\troubleshoot_figures\`. Both are outside the repo; never commit
-  data or images.
+- Data: one folder per experiment, `C:\Users\ReschLab\Desktop\HOI_freshstaret\data\troubleshoot\<date>\<HHMM>_<name>\`
+  with `runs\` (.npz) and `figures\` (.png, reports) inside. Start every experiment script with
+  `ht.new_experiment("agent_<short_name>")` (or `with ht.experiment(...)`), so its runs and figures
+  land together. `ht.load_runs()` searches every experiment; `ht.list_experiments("exp5")` finds
+  folders. Data are outside the repo; never commit data or images.
 - Only one program can hold the camera. Check it is free first:
   `python -c "import sys; sys.path.insert(0, r'C:\Users\ReschLab\Desktop\HOI_freshstaret\src'); import camera_control as cc; c = cc.connect_camera(); print('free'); c.close()"`.
   If it isn't free, stop and say so. Never kill other processes.

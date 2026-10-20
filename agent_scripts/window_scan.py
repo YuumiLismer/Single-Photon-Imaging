@@ -30,7 +30,7 @@ p.add_argument("--stop-z", type=float, default=6.0, help="stop early once a wind
 a = p.parse_args()
 spot = tuple(a.spot)
 stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-folder = ht.FIG_DIR / f"agent_{a.tag}_{stamp}"; folder.mkdir(parents=True, exist_ok=True)
+folder = ht.new_experiment(f"agent_{a.tag}") / "figures"   # runs go to the same experiment folder
 delays = np.arange(a.start, a.stop, a.width)
 base = dict(gain=a.gain, gate_width_ns=a.width, accumulations=a.acc, n_readouts=a.readouts,
             trigger_source="External", trigger_threshold_v=0.5, roi_center=(500, 455), notes=f"agent {a.tag}")
@@ -90,9 +90,7 @@ try:
         ax[i].set_title(" ".join(f"{s['delay']:g}:{s['z_' + key]:+.1f}" for s in sorted(sc, key=lambda s: -s['z_' + key])[:3]), fontsize=8)
     fig.suptitle(f"{a.tag}: {ht.fmt_ns(a.width)} windows, gain {a.gain}, {a.acc:,} acc x {sc[0]['n']} readouts each, spot {spot}")
     fig.tight_layout(); fig.savefig(folder / "window_scan.png", dpi=110)
-    ht.FIG_DIR, old = folder, ht.FIG_DIR
     ht.plot_delay_scan([runs[d] for d in sorted(runs)], threshold=a.thr, spot=spot, save_as="delay_scan")
-    ht.FIG_DIR = old
 finally:
     ht.shutdown(cam)
 print("FIGS", folder)

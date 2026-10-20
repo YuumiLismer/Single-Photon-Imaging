@@ -25,7 +25,7 @@ p.add_argument("--spot", type=int, nargs=2, default=(501, 454)); p.add_argument(
 p.add_argument("--tag", default="ab")
 a = p.parse_args()
 spot = tuple(a.spot)
-folder = ht.FIG_DIR / f"agent_{a.tag}_{datetime.datetime.now():%Y%m%d_%H%M%S}"; folder.mkdir(parents=True, exist_ok=True)
+folder = ht.new_experiment(f"agent_{a.tag}") / "figures"   # runs go to the same experiment folder
 base = dict(gain=9000, gate_width_ns=a.width, accumulations=a.acc, n_readouts=a.readouts, trigger_source="External",
             trigger_threshold_v=0.5, roi_center=(500, 455), notes=f"agent {a.tag}")
 acc = {"on": dict(net=[], raw=[], img=0, n=0, t=0.0), "off": dict(net=[], raw=[], img=0, n=0, t=0.0)}

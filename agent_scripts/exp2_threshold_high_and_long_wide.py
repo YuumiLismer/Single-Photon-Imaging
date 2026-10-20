@@ -10,6 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import hoi_troubleshoot as ht
 
 SPOT = (501, 454)
+ht.new_experiment("agent_exp2_wide_long")      # runs and figures go in one dated folder
 N_WIDE = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 cam, limits = ht.open_camera()
 try:

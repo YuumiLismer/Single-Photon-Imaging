@@ -18,8 +18,8 @@ Steps (each logged to report.md, each figure saved as PNG in the same folder):
   6. long target image at the peak + off-delay background, with all figures
 The camera is left in a safe state at the end (lowest gain, intensifier off).
 
-Output: Desktop/HOI_freshstaret/data/processed/troubleshoot_figures/hunt_<timestamp>/
-Runs (.npz) go to the usual troubleshoot data folder, so compare_runs.ipynb sees them.
+Output: one experiment folder, Desktop/HOI_freshstaret/data/troubleshoot/<date>/<HHMM>_photon_hunt/,
+with the runs (.npz) in runs/ and report.md plus the figures in figures/.
 """
 
 import argparse
@@ -109,10 +109,9 @@ def check_saturation(run, rep, limit=1e-3):
 def hunt(cam=None, args=None):
     a = args or parse_args([])
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    folder = ht.FIG_DIR / f"hunt_{stamp}"
-    folder.mkdir(parents=True, exist_ok=True)
-    fig_dir_before = ht.FIG_DIR
-    ht.FIG_DIR = folder
+    experiment_before = ht.EXPERIMENT_DIR
+    ht.new_experiment("photon_hunt")          # runs/ and figures/ for this hunt only
+    folder = ht.FIG_DIR
     rep = Report(folder)
     rep.log(f"# Heralded-photon hunt {stamp}")
     rep.log(f"Settings: {vars(a)}")
@@ -281,7 +280,7 @@ def hunt(cam=None, args=None):
                 ht.shutdown(cam)
             except Exception as e:
                 rep.log(f"(shutdown: {e})")
-        ht.FIG_DIR = fig_dir_before
+        ht.set_experiment(experiment_before, quiet=True)
         rep.log(f"\nReport and figures: {folder}")
     return result, folder
 

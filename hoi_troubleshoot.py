@@ -25,6 +25,7 @@ import sys
 import json
 import time
 import datetime
+import re
 import pathlib
 
 import numpy as np
@@ -37,8 +38,15 @@ from scipy.ndimage import gaussian_filter
 # --------------------------------------------------------------------------------------
 
 HOI_ROOT = pathlib.Path(r"C:\Users\ReschLab\Desktop\HOI_freshstaret")
-DATA_DIR = HOI_ROOT / "data" / "raw" / "troubleshoot"
-FIG_DIR = HOI_ROOT / "data" / "processed" / "troubleshoot_figures"
+# Every experiment gets its own folder, sorted by date and start time:
+#   data/troubleshoot/2026-10-20/1614_agent_exp5_on_off_test/runs/      (.npz runs)
+#                                                           /figures/   (.png, reports)
+# Call new_experiment("name") before a block of runs. If a run or figure is saved before
+# that, an experiment called "session" is started automatically.
+DATA_ROOT = HOI_ROOT / "data" / "troubleshoot"
+EXPERIMENT_DIR = None           # folder of the current experiment (set by new_experiment)
+DATA_DIR = None                 # EXPERIMENT_DIR / "runs"
+FIG_DIR = None                  # EXPERIMENT_DIR / "figures"
 
 if str(HOI_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(HOI_ROOT / "src"))
@@ -48,6 +56,69 @@ MAX_GAIN = 9000                 # emICCD gain safety limit (never exceed)
 MAX_GATE_OPEN_S = 1.0           # above gain 1000: gate width x accumulations per readout
 SESSION_RUNS = []               # every run taken (or loaded) in this kernel, in order
 
+
+
+# --------------------------------------------------------------------------------------
+# Experiment folders
+# --------------------------------------------------------------------------------------
+
+def _slug(name):
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_") or "experiment"
+
+
+def new_experiment(name, when=None, quiet=False):
+    """Start a new experiment folder DATA_ROOT/<YYYY-MM-DD>/<HHMM>_<name>/ with runs/ and
+    figures/ inside, and send every following run and figure there. Returns the folder."""
+    when = when or datetime.datetime.now()
+    day = DATA_ROOT / f"{when:%Y-%m-%d}"
+    folder = day / f"{when:%H%M}_{_slug(name)}"
+    k = 2
+    while folder.exists():
+        folder = day / f"{when:%H%M}_{_slug(name)}_{k}"
+        k += 1
+    (folder / "runs").mkdir(parents=True)
+    (folder / "figures").mkdir()
+    set_experiment(folder, quiet=quiet)
+    return folder
+
+
+def set_experiment(folder, quiet=False):
+    """Point runs and figures at an existing experiment folder (None unsets it)."""
+    global EXPERIMENT_DIR, DATA_DIR, FIG_DIR
+    if folder is None:
+        EXPERIMENT_DIR = DATA_DIR = FIG_DIR = None
+        return None
+    EXPERIMENT_DIR = pathlib.Path(folder)
+    DATA_DIR = EXPERIMENT_DIR / "runs"
+    FIG_DIR = EXPERIMENT_DIR / "figures"
+    if not quiet:
+        print(f"experiment folder: {EXPERIMENT_DIR}")
+    return EXPERIMENT_DIR
+
+
+class experiment:
+    """`with ht.experiment("name") as folder:` starts a new experiment folder and puts the
+    previous one back afterwards (used by photon_hunt and the agent scripts)."""
+    def __init__(self, name):
+        self.name = name
+
+    def __enter__(self):
+        self.before = EXPERIMENT_DIR
+        return new_experiment(self.name)
+
+    def __exit__(self, *exc):
+        set_experiment(self.before, quiet=True)
+        return False
+
+
+def _ensure_experiment():
+    if EXPERIMENT_DIR is None:
+        new_experiment("session")
+
+
+def list_experiments(contains=""):
+    """All experiment folders, oldest first."""
+    return sorted(p for p in DATA_ROOT.glob("*/*") if p.is_dir() and contains in p.name)
 
 # --------------------------------------------------------------------------------------
 # Settings
@@ -520,7 +591,10 @@ def run_name(run):
     return f"{stamp}_{m['settings']['label']}_{m['settings']['kind']}"
 
 
-def save_run(run, folder=DATA_DIR):
+def save_run(run, folder=None):
+    if folder is None:
+        _ensure_experiment()
+        folder = DATA_DIR
     folder = pathlib.Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{run_name(run)}.npz"
@@ -539,11 +613,14 @@ def load_run(path):
     return run
 
 
-def load_runs(folder=DATA_DIR, contains=""):
-    """All runs in `folder` whose file name contains `contains`, oldest first.
-    Unreadable files (e.g. one still being written) are skipped with a note."""
+def load_runs(folder=None, contains=""):
+    """All runs under `folder` (searched recursively; default: every experiment in
+    DATA_ROOT) whose file name contains `contains`, oldest first. `folder` can be an
+    experiment folder, a day folder or a runs/ folder. Unreadable files (e.g. one still
+    being written) are skipped with a note."""
     out = []
-    for p in sorted(pathlib.Path(folder).glob(f"*{contains}*.npz")):
+    files = pathlib.Path(folder or DATA_ROOT).rglob(f"*{contains}*.npz")
+    for p in sorted(files, key=lambda q: q.name):
         try:
             out.append(load_run(p))
         except Exception as e:
@@ -1453,6 +1530,7 @@ def plot_wiener(run, dark, window=9, save_as=None):
 
 
 def _savefig(fig, name):
+    _ensure_experiment()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     path = FIG_DIR / f"{name}.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")

@@ -12,6 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import hoi_troubleshoot as ht
 
 SPOT = (501, 454)
+ht.new_experiment("agent_exp1_wide_gate")      # runs and figures go in one dated folder
 out = {}
 cam, limits = ht.open_camera()
 try:
