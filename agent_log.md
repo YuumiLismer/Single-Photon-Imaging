@@ -1,0 +1,59 @@
+# Photon-hunter agent log
+
+Remote session(s) by the photon-hunter agent. Newest entries at the bottom. Data:
+`Desktop/HOI_freshstaret/data/raw/troubleshoot/`, figures: `.../data/processed/troubleshoot_figures/`.
+
+## 2026-10-20 session 1 (remote; Tristan: 45 kHz triggers idler open, 5 kHz idler blocked; spot (501, 454))
+
+### E0 (14:55, no camera) Re-analysis of hunt_20261020_134544 at the known spot
+- Hypothesis: the hunt scored its coarse windows at an auto-found "spot" (486, 430), not at the beam
+  position (501, 454), so it could have missed a heralded excess at the real spot.
+- Method: re-scored every saved wide-gate and coarse run at both positions (aperture r=10 px,
+  ring 20-35 px; hits = pixels >= 200 ADU above the readout's median).
+- Result: at (501, 454) the coarse 1 us windows (27 ns .. 10 us, 160 readouts x 5000 acc) are flat:
+  ring-subtracted spot ADU 1540-1760 per readout (+-45), spot hits 0.12-0.30 per readout, with no
+  window standing out. Wide gate at (501, 454): 98148 ADU, contrast 44.6 at 12:21 (high pump);
+  9446 ADU, contrast 4.2 at 13:24; 4480 ADU, contrast 1.4 at 13:46 (the hunt reference).
+  The ~1700 ADU at 1 us is the same at every delay and in the 27 ns window, so it is fixed pattern,
+  not light.
+- Conclusion: the wrong spot did not hide anything; the old coarse scan is flat at the real spot too.
+  The wide-gate beam at (501, 454) was already fading between 13:24 and 13:46.
+
+### E1 (14:58) Trigger rate vs threshold and edge; wide-gate beam check (agent_scripts/exp1_trigger_and_beam.py)
+- Hypothesis: if the herald pulse is only ~0.5 V, the rate should fall steeply above 0.5 V and climb
+  below it (noise). A flat rate means clean pulses.
+- Settings: gain 1, 3 ns gate, 100,000 acc x 4 readouts per point, rising edge 0.2-1.0 V, falling 0.5 V.
+- Result: 38.3, 37.7, 37.7, 38.2, 39.6, 41.3, 41.7, 43.0 kHz at 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0 V
+  (rising); 43.4 kHz falling 0.5 V. Flat within the slow drift of the source (the readings go up in
+  time order, not with threshold).
+- Wide gate 309 ns + 100 us, 5000 acc x 40 readouts, gain 9000: ring-subtracted spot at (501, 454)
+  694 +- 408 ADU per readout (1.7 sigma), compactness contrast -0.1: no compact beam spot.
+  Figure: troubleshoot_figures/agent_exp1_agent_wide100us.png.
+- Incident: the script did not set the Agg backend, so plt.show() blocked after the first wide
+  run; I stopped my own process and re-opened the camera in E2 (which closes it properly).
+
+### E2 (15:15) Thresholds above 1 V; long wide gate at the light limit (agent_scripts/exp2_threshold_high_and_long_wide.py)
+- Result, trigger rate: 41.8, 40.9, 39.9, 39.0 kHz at 1.5, 2.0, 2.5, 3.0 V, then 38.4 kHz at 0.5 V.
+  The rate is flat from 0.2 V to 3.0 V: the camera sees clean pulses taller than 3 V (the "0.5 V"
+  scope reading cannot be the pulse that reaches TRIGGER IN, or the pulse is much taller than
+  measured). Marginal triggering and noise triggers are ruled out; threshold 0.5 V is fine.
+- Wide gate 309 ns + 20 us (shorter than the ~22 us mean trigger spacing), 50,000 acc
+  (1.0 s gate-open per readout) x 100 readouts, gain 9000: spot (501, 454) ring-subtracted
+  -6124 +- 513 ADU per readout; aperture hits 30.9 per readout. The image shows a ~50 px wide
+  ring centred near (500, 450) with a dark middle, and a bright blob near (750, 440).
+  Figure: troubleshoot_figures/agent_exp2_wide20us_1s.png.
+- Analysis (radial profiles, all wide-gate runs, per 1 s of gate-open time): the ring at r = 20-40 px
+  and the blob at (750, 440) are equally present in the 12:25 signal-arm-BLOCKED run, so they are
+  not signal-arm light. The beam itself is the compact core (r < 6 px minus r = 10-16 px):
+  12:21 high pump 123,000 +- 2,800; blocked -2,700 +- 500; 13:24 13,500 +- 1,100;
+  13:46 6,900 +- 1,100; now 2,250 +- 540 (E1) and 790 +- 290 (E2) ADU per s gate-open.
+  Relative to the blocked run the beam is still there now at ~3,500-5,000 ADU/s (6-7 sigma),
+  i.e. ~25-35x weaker than at 12:21 and ~2x weaker than during the last hunt.
+- Conclusion: triggers are clean (~40 kHz) but very little signal-arm light reaches the camera:
+  of order a few detected photons per second. Heralded photons per trigger are at most
+  (signal detections/s) / (triggers/s) ~ 1e-4 even if every signal photon were heralded, so
+  1 us windows (background ~3e-5 hit pixels per gate per us in the spot) need ~1000s of readouts.
+  Narrow (100 ns) windows with 50,000 accumulations per readout give ~10x better S/B at the
+  same trigger time; next step is a 100 ns-window scan over the fibre-delay estimate region.
+- Background budget used for planning (old runs): spot hits per readout 0.05 with 10 ns x 5000 acc,
+  ~0.2 with 1 us x 5000 acc; ~31 per 1 s gate-open (E2). ROI-wide hits are mostly per readout.
