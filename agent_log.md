@@ -57,3 +57,31 @@ Remote session(s) by the photon-hunter agent. Newest entries at the bottom. Data
   same trigger time; next step is a 100 ns-window scan over the fibre-delay estimate region.
 - Background budget used for planning (old runs): spot hits per readout 0.05 with 10 ns x 5000 acc,
   ~0.2 with 1 us x 5000 acc; ~31 per 1 s gate-open (E2). ROI-wide hits are mostly per readout.
+
+### E3 (15:22-15:46) 100 ns windows, 27-2027 ns, interleaved (agent_scripts/window_scan.py --tag exp3)
+- Hypothesis: with the beam this weak, 1 us windows are background-limited; 100 ns windows with
+  50,000 acc per readout should cut the in-gate background ~10x at the same trigger time.
+- Settings: gain 9000, 20 windows of 100 ns (27, 127, ... 1927 ns), 50,000 acc, 3 passes x 15
+  readouts in shuffled order -> 45 readouts (2.25 M gates, ~60 s of triggers) per window; spot (501, 454).
+- Raw result (spot hits r<=10, >=200 ADU above the readout median): 3.4-5.8 hits per readout in every
+  window; best 1827 ns at +3.9 sigma, earliest windows low (27 ns: -3.1, r<=20: -6.8 sigma).
+- New finding, background: hits per readout track the readout interval (corr 0.86 over exp3 runs;
+  ~200 ROI hits/s whatever the gate width: 100 ns x 50k and 10 ns x 5k give the same hits per
+  second). So the dominant background is NOT in the gate: it accumulates with wall-clock time
+  (MCP dark events or light leaking past the gated photocathode, plus CCD). The trigger rate
+  drifts (readout 1.16-1.47 s per 50k triggers), which moved the raw scores; the early-window
+  deficit is drift, the same on the whole sensor (also seen at r > 50 px and in the pedestal).
+  Consequence: narrow windows do not lower the background much; wider windows cost little.
+- Drift-corrected score (spot hits minus area-scaled hits at r > 50 px in the same readout):
+  flat. All windows between -0.66 and +0.77 net hits per readout (errors ~0.3); best 1827 ns at
+  +2.9 sigma (r<=10) / +1.9 sigma (r<=6), driven by one pass (+0.41, +0.37, +1.52). Not significant
+  for 20 trials.
+- Sensitivity: beam now ~12-15 hit pixels/s (gate open) in r<=10, so heralded <= 15 x eta hits/s,
+  eta = probability that a detected signal photon's twin made a trigger. ~60 s per window at
+  ~3 hits/s background excludes eta >~ 0.1 for a delay in 27-2027 ns.
+- Event heights: photon events at gain 9000 peak at only ~200-300 ADU per pixel (median ~210-270),
+  so the 200 ADU threshold cuts ~40% of real events; but background events have similar heights
+  (median ~190), so raising/lowering the threshold does not separate them.
+- Figures: troubleshoot_figures/agent_exp3_20261020_152224/ (window_scan.png, delay_scan_*.png).
+- Code: window_scan.py now scores with the drift-corrected net hits (tested offline on exp3 runs:
+  reproduces 1827 ns +0.77, z 2.9).
