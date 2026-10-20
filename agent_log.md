@@ -150,3 +150,36 @@ The 20 Oct runs and figures were moved from `data/raw/troubleshoot` and
 `1346_photon_hunt`, `1459_agent_exp1_wide_gate`, `1515_agent_exp2_wide_long`,
 `1522_agent_exp3_100ns_scan`, `1547_agent_exp4_500ns_scan`, `1614_agent_exp5_on_off_test`
 (each with `runs/` and `figures/`). Figure paths in the entries above refer to the old layout.
+
+## 2026-10-20 session 2 (remote; second agent; camera free, Tristan's kernel 13928 not holding it)
+
+### E6 (17:00-17:39) Wide 5 us gate on/off test + short-gate reference (agent_scripts/multi_ab.py --tag wide_ab)
+- Hypothesis: most background is ungated (E3), so a 5 us gate from 27 ns catches the heralded photon
+  at any plausible delay (110-130 m fibre + cables) for little extra background.
+- Trigger rate at the start (3 ns x 100k acc): 25.4 kHz.
+- Settings: gain 9000, 50,000 acc; arms on = 27 ns + 5 us (0.25 s gate-open/readout), off = 15027 ns + 5 us
+  (shift 15 us > width; gate 20 us after the trigger is still well inside the ~40 us mean trigger spacing),
+  short = 15027 ns + 50 ns (beam/stray-light zero point); blocks 12/12/6 readouts, order rotated,
+  36 cycles -> 432/432/216 readouts (21.6 M gates per arm). s/readout: on 1.53, off 2.31, short 2.04.
+- Expected before: heralded 1e-5..3e-5 spot hits/trigger -> 0.5-1.5 hits/readout; per-readout noise ~4-5
+  hits -> sigma(on-off) ~0.3 after 430 readouts each, i.e. ~2-5 sigma.
+- Result (offline, agent_scripts/analyze_ab.py and a per-run per-pixel-baseline version; the off arm
+  has 0.78 s more wall time per readout, fitted out with a hits-per-second term):
+  r<=10 disk on-off = -0.14 +- 0.41 hits/readout; beam-profile matched filter -0.28 +- 0.17 (z -1.6);
+  r<=6 -0.51 +- 0.23 (z -2.2, wrong sign for signal). Online drift-free net score: z +0.03. FLAT.
+- Upper limit (2 sigma, 27-5027 ns): < 1.4e-5 heralded spot hits per trigger (matched filter;
+  1.8e-5 with the r<=10 disk). Same per-trigger limit as E5 but for the whole plausible delay range.
+- NEW finding, in-gate light: with the gate open the camera images a lit scene, not just the beam
+  (figures/full_frame_in_gate.png): a square mount with a bright ring around (501, 454) and a dark
+  centre, bright columns below, a blob at (750, 440), brighter bottom-left. ~0.04 hits/px per 0.25 s
+  gate-open (= 0.16 hits/px/s, ~50 hits/s in r<=10), i.e. continuous stray (room/ambient or scatter)
+  light that leaks into the imaging path. For a 5 us gate at 25 kHz this is ~3x the ungated background,
+  so the 'wide gates are cheap' idea only holds for gates <~1 us. The ring + dark centre also explain
+  the 'hole' at the spot seen in E3/E5 hit maps (the scene is dark exactly at the fibre image), so it is
+  not intensifier gain loss as I first suspected (commit 65c5eb1 message).
+- Beam today: no compact excess at (501, 454) on top of the scene; core (r<=6) minus annulus (10-16 px)
+  -0.31 +- 0.10 hits per readout (0.25 s gate-open) -> signal-arm light < ~1 hit/s in the core, i.e.
+  below even the E2 level. With no detectable signal-arm light, the expected heralded rate is
+  ~0 and no gate setting can find it.
+- Figures: data/troubleshoot/2026-10-20/1700_agent_wide_ab/figures/ (multi_ab.png, in_gate_light.png,
+  full_frame_in_gate.png, records.json, analysis.json).
