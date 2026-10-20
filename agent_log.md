@@ -183,3 +183,37 @@ The 20 Oct runs and figures were moved from `data/raw/troubleshoot` and
   ~0 and no gate setting can find it.
 - Figures: data/troubleshoot/2026-10-20/1700_agent_wide_ab/figures/ (multi_ab.png, in_gate_light.png,
   full_frame_in_gate.png, records.json, analysis.json).
+
+### E7 (17:57-18:39) Early window 27-527 ns on/off (multi_ab.py --tag early_ab; Tristan: "start at ~100 ns")
+- Hypothesis: the heralded delay could be ~100 ns (shorter than the fibre estimate, e.g. if the trigger
+  path is long too). A 500 ns gate has ~10x less in-gate stray light than 5 us (E6), so it is the most
+  sensitive way to cover 27-527 ns.
+- Trigger rate at the start: 21.4 kHz (down from 25.4 kHz at 17:00).
+- Settings: gain 9000, 50,000 acc (25 ms gate-open/readout), on = 27 ns + 500 ns, off = 5027 ns + 500 ns
+  (shift 10x the width; smaller dead-time mismatch than a 15 us shift), blocks of 12, order alternated,
+  39 cycles -> 468 readouts per arm (23.4 M gates each). s/readout on 2.26, off 2.53.
+- Result: online drift-free net r<=10: on -0.32 vs off -0.63, z +1.5. Offline (analyze_ab, per-run
+  baseline + interval regression): r<=6 -0.04 +- 0.11, r<=10 -0.39 +- 0.17, matched filter -0.15 +- 0.08
+  (z -1.9). FLAT; the two analyses disagree in sign at the 1.5-2 sigma level, which is the size of the
+  dead-time systematic, so nothing here is a candidate.
+- Upper limit 27-527 ns (2 sigma, matched filter): < 6.5e-6 heralded spot hits per trigger (r<=6: 7.3e-6),
+  about 2x tighter than E5 (300-900 ns) and E6 (27-5027 ns), and below the 1e-5..3e-5 expected from the
+  afternoon beam brightness. But see E6: the beam itself is not detectable today, so the expectation
+  today is ~0.
+- Figures: data/troubleshoot/2026-10-20/1757_agent_early_ab/figures/ (multi_ab.png, records.json, analysis.json).
+
+### Session 2 summary (camera ~85 min: 17:00-17:39 and 17:57-18:39, closed with ht.shutdown each time)
+- No heralded photons. Limits (2 sigma, heralded spot hits per trigger): 27-527 ns < 6.5e-6;
+  27-5027 ns < 1.4e-5.
+- New: with the gate open the camera sees a lit scene (stray light, ~0.16 hits/px/s) whose dark centre is
+  exactly at (501, 454); the signal-arm beam is not detectable on top of it today (core minus annulus
+  -0.31 +- 0.10 hits per 0.25 s gate-open). Wide gates are not cheap (5 us: stray light ~3x the ungated
+  background); keep gates <= ~500 ns once the delay range is known.
+- Stopped early: `git push` was refused by the session's permission system, so per the git rules I
+  stopped and did not run agent_scripts/bg_probe.py (ungated-background origin + MCP bracket gating test;
+  written, untested, not committed).
+- Needs a person in the lab: (1) make the signal beam visible again at a wide gate (it was contrast ~40 at
+  12:21, gone now): check pump power, SPDC/fibre coupling, the signal fibre end at the camera;
+  (2) find and block the stray light (room lights/LEDs/pump scatter lighting the mount around the fibre
+  output; cover the camera-to-fibre path); (3) the coincidence/delay check on the time tagger with an APD
+  (session 1 list); (4) trigger rate fell again 25.4 -> 21.4 kHz in 1 h.
