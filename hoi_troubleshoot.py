@@ -44,6 +44,8 @@ if str(HOI_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(HOI_ROOT / "src"))
 
 SATURATION_ADU = 65000          # 16-bit ADC; flag pixels at or above this
+MAX_GAIN = 9000                 # emICCD gain safety limit (never exceed)
+MAX_GATE_OPEN_S = 1.0           # above gain 1000: gate width x accumulations per readout
 SESSION_RUNS = []               # every run taken (or loaded) in this kernel, in order
 
 
@@ -458,6 +460,13 @@ def take_run(cam, save=True, **settings):
     if unknown:
         raise ValueError(f"Unknown setting(s): {sorted(unknown)}. Valid: {sorted(DEFAULT_SETTINGS)}")
     s = {**DEFAULT_SETTINGS, **settings}
+    open_s = float(s["gate_width_ns"]) * 1e-9 * int(s["accumulations"])
+    if float(s["gain"]) > MAX_GAIN:
+        raise ValueError(f"gain {s['gain']} exceeds the safety limit {MAX_GAIN}")
+    if float(s["gain"]) > 1000 and open_s > MAX_GATE_OPEN_S + 1e-9:
+        raise ValueError(f"{fmt_ns(s['gate_width_ns'])} x {int(s['accumulations']):,} acc = {open_s:.2f} s of "
+                         f"gate-open time per readout at gain {s['gain']}; the intensifier limit is "
+                         f"{MAX_GATE_OPEN_S:g} s above gain 1000. Lower the accumulations or the width.")
     print(f"=== {s['label']} [{s['kind']}] ===")
     configure(cam, s, verbose=False)
     rb = read_state(cam)

@@ -151,7 +151,9 @@ def hunt(cam=None, args=None):
 
         # 2. wide-gate reference -------------------------------------------------------
         rep.log("\n## 2. Wide-gate reference (is the beam on the sensor?)")
-        ref = ht.take_run(cam, **{**base, "label": "hunt_ref_wide", "n_readouts": a.ref_readouts})
+        ref_acc = int(min(a.accumulations, ht.MAX_GATE_OPEN_S / (base["gate_width_ns"] * 1e-9)))
+        ref = ht.take_run(cam, **{**base, "label": "hunt_ref_wide", "n_readouts": a.ref_readouts,
+                                  "accumulations": ref_acc})
         check_saturation(ref, rep)
         spot = tuple(a.spot) if a.spot else ht.find_spot(ref, None)
         s = ht.spot_series(ref, spot)
