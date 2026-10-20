@@ -142,3 +142,11 @@ Remote session(s) by the photon-hunter agent. Newest entries at the bottom. Data
   4. Check whether the idler path to TRIGGER IN has extra delay (long cable, delay box, time
      tagger output): if the trigger arrives after the signal photon, no gate delay can catch it.
   5. Scope TRIGGER IN: the rate is flat up to 3 V, so the pulse is > 3 V there, not ~0.5 V.
+
+## Data reorganized (20 Oct, ~16:55)
+The 20 Oct runs and figures were moved from `data/raw/troubleshoot` and
+`data/processed/troubleshoot_figures` into one folder per experiment under
+`Desktop/HOI_freshstaret/data/troubleshoot/2026-10-20/`: `1221_notebook_session`,
+`1346_photon_hunt`, `1459_agent_exp1_wide_gate`, `1515_agent_exp2_wide_long`,
+`1522_agent_exp3_100ns_scan`, `1547_agent_exp4_500ns_scan`, `1614_agent_exp5_on_off_test`
+(each with `runs/` and `figures/`). Figure paths in the entries above refer to the old layout.
