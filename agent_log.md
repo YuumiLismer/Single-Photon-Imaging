@@ -105,3 +105,40 @@ Remote session(s) by the photon-hunter agent. Newest entries at the bottom. Data
   SPDC/idler alignment is drifting down, not only Tristan's pump change.
 - Conclusion: no heralded window between 27 ns and 5027 ns at this sensitivity.
 - Figures: troubleshoot_figures/agent_exp4_20261020_154719/.
+
+### E5 (16:14-16:39) On/off-delay A/B at the fibre-delay estimate (agent_scripts/ab_test.py --tag exp5)
+- Hypothesis: if heralded photons arrive 450-600 ns after the trigger, a 300-900 ns gate shows more
+  net spot hits than the same gate 10 us later.
+- Settings: gain 9000, gate 600 ns, 50,000 acc (30 ms gate-open per readout), on = 300 ns,
+  off = 10,300 ns, alternated in blocks of 12 readouts, 23 cycles -> 276 readouts each
+  (13.8 M gates each; 2.28 s per on readout -> ~22 kHz accepted triggers).
+- Result: drift-free net spot hits -0.77 (on) vs -0.91 (off) per readout, z = +0.5. Raw hits
+  10.8 vs 14.3 (z = -12): the off runs read out slower (2.78 vs 2.28 s, dead time of the 10 us
+  delay), so they collect more ungated background; the net metric removes that.
+- Upper limit: on - off < ~0.7 hit pixels per readout (2 sigma) -> < ~1.4e-5 heralded hit pixels
+  per trigger in r <= 10 px at 300-900 ns.
+- Figure: troubleshoot_figures/agent_exp5_20261020_161415/ab_test.png.
+
+### Session summary (camera ~100 min, closed with ht.shutdown after every script)
+- No heralded photons found. Nothing reached 5 sigma: best candidates 1827 ns (+2.9, E3),
+  527 ns (+1.3, E4), 300-900 ns on/off +0.5 (E5).
+- Ruled out remotely: marginal/noisy triggering (rate flat 0.2-3.0 V, both edges); gates not
+  opening per trigger or ignoring the delay (dead-time slope ~1 vs delay); wrong scoring spot
+  for the old hunt (re-scored at (501, 454): flat); threshold-limited triggering.
+- Found: (1) very little signal-arm light reaches (501, 454): beam core ~30x weaker than at
+  12:21 and still fading; the ring and the (750, 440) blob are in the blocked-arm run too, so
+  they are not the beam. (2) The dominant background is ungated, wall-clock-proportional
+  (~200 hits/s over the 150x150 ROI) so raw hit scores follow the trigger-rate drift and the
+  dead time; scans must use the drift-free (spot minus far-field) score. (3) The trigger rate
+  fell from ~40 kHz to ~22-25 kHz during the session.
+- Needs a person in the lab (cannot be tested remotely):
+  1. Measure the idler-signal coincidence rate and delay on the time tagger, with the signal
+     fibre's camera end on an APD. If coincidences/idler singles are << 1%, the 40 kHz triggers
+     are mostly not SPDC idlers or the signal arm is badly coupled; fix that first.
+  2. Check what drifts: pump power at the crystal, SPDC/idler alignment (trigger rate fell
+     ~40 -> ~25 kHz in 1.5 h, beam at the camera fell ~30x since 12:21).
+  3. Re-couple / re-align the signal fibre output onto the camera; at the current level
+     (~10 detected photons/s at the wide gate) even a perfect herald gives < 1 heralded photon/s.
+  4. Check whether the idler path to TRIGGER IN has extra delay (long cable, delay box, time
+     tagger output): if the trigger arrives after the signal photon, no gate delay can catch it.
+  5. Scope TRIGGER IN: the rate is flat up to 3 V, so the pulse is > 3 V there, not ~0.5 V.
