@@ -2,15 +2,18 @@
 
     python agent_scripts/analyze_ab.py <experiment folder> --on on --off off [--thr 200]
 
-Improvements over the online score (see agent_log session 2):
- * per-pixel baseline: each readout minus its median (as before) minus the per-pixel temporal median
-   over the whole experiment. The beam spot sits ~12 ADU below its surroundings in long runs
-   (a local 'hole' in the ungated background), which biased fixed-threshold hit counts;
- * regression instead of a fixed far-field subtraction: y = mu_arm + k * far_hits (fit on all arms),
-   so readout-interval (ungated background) and in-gate stray light differences are absorbed by k;
+Improvements over the online score (see agent_log E6):
+ * per-run, per-pixel baseline: each readout minus its median (as before) minus the per-pixel temporal
+   median of its own run. The in-gate stray-light scene (a lit mount with a ring and a dark centre
+   at the spot) and the ungated background change the local pedestal with the arm and the wall time,
+   which biased fixed-threshold counts with a global baseline;
+ * regression on run blocks: y = mu_arm + rate * (s per readout), weighted by readouts, so the extra
+   ungated background of the arm with more dead time (longer readout interval) is fitted out
+   (the far-field subtraction cannot do this: the in-gate stray light is not uniform);
  * three spot statistics: hits in r<=6, r<=10, and a matched filter weighted by the 12:21
    high-pump beam profile (signal minus signal-blocked, independent data; peak-normalised, r<=15).
-Prints mu_on - mu_off (per readout and per trigger) with its z for each statistic.
+Prints mu_on - mu_off (per readout and per trigger, corrected for the fraction of a beam-shaped spot
+each statistic counts) with its z.
 """
 import argparse, sys, pathlib, json, re
 import numpy as np
@@ -51,37 +54,34 @@ def main():
     prof = w / w.sum()            # beam profile (fraction of the spot's hits per pixel), r <= 15
     eff = dict(h6=prof[rr <= 6].sum(), h10=prof[rr <= 10].sum(), mf=(w * prof).sum())
     print("fraction of a beam-shaped spot counted by each statistic:", {k: round(float(v), 3) for k, v in eff.items()})
-    stacks = [ht.above_pedestal(r) for r in runs]
-    base = np.median(np.concatenate(stacks), axis=0)
     far = rr > 50
     rows = []
-    for r, st in zip(runs, stacks):
-        hit = (st - base) >= a.thr
-        acc = int(r["meta"]["actual"]["accumulations"])
-        for h in hit:
-            rows.append(dict(arm=arm_of(r), far=h[far].mean() * far.sum(), h6=h[rr <= 6].sum(), h10=h[rr <= 10].sum(),
-                             mf=(h * w).sum(), acc=acc, dt=ht.readout_interval_s(r)))
+    for r in runs:
+        st = ht.above_pedestal(r)
+        hit = (st - np.median(st, axis=0)) >= a.thr
+        rows.append(dict(arm=arm_of(r), n=len(hit), dt=ht.readout_interval_s(r), far=hit[:, far].mean() * 1e4,
+                         h6=hit[:, rr <= 6].sum(1).mean(), h10=hit[:, rr <= 10].sum(1).mean(),
+                         mf=(hit * w).sum((1, 2)).mean(), acc=int(r["meta"]["actual"]["accumulations"])))
     arms = sorted({x["arm"] for x in rows})
-    print("arms:", {k: sum(x["arm"] == k for x in rows) for k in arms})
-    X = np.array([[x["arm"] == k for k in arms] + [x["far"]] for x in rows], float)
+    print("readouts per arm:", {k: sum(x["n"] for x in rows if x["arm"] == k) for k in arms})
+    X = np.array([[x["arm"] == k for k in arms] + [x["dt"]] for x in rows], float)
+    W = np.sqrt([x["n"] for x in rows])
     out = {}
     for stat in ("h6", "h10", "mf"):
         y = np.array([x[stat] for x in rows], float)
-        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
-        res = y - X @ beta
-        cov = np.linalg.inv(X.T @ X) * res.var(ddof=X.shape[1])
+        beta, *_ = np.linalg.lstsq(X * W[:, None], y * W, rcond=None)
+        res = (y - X @ beta) * W
+        cov = np.linalg.inv((X * W[:, None]).T @ (X * W[:, None])) * res.var(ddof=X.shape[1])
         i, j = arms.index(a.on), arms.index(a.off)
         d = beta[i] - beta[j]; e = np.sqrt(cov[i, i] + cov[j, j] - 2 * cov[i, j])
-        # simple version too: per-arm mean of y - k*far with k from the fit
-        out[stat] = dict(diff=d, err=e, z=d / e, k=beta[-1], mu={k: beta[n] for n, k in enumerate(arms)},
-                         eff=eff[stat], spot_hits_per_trigger=d / eff[stat] / rows[0]["acc"],
-                         err_per_trigger=e / eff[stat] / rows[0]["acc"],
-                         per_trigger_2sigma_limit=(max(d, 0) + 2 * e) / eff[stat] / rows[0]["acc"])
-        print(f"{stat:4s}: on-off = {d:+.3f} +- {e:.3f} per readout (z {d / e:+.2f}); k_far = {beta[-1]:.4f}; "
-              f"means " + ", ".join(f"{k} {beta[n]:.2f}" for n, k in enumerate(arms)) +
-              f"; spot hits/trigger {out[stat]['spot_hits_per_trigger']:+.2e} +- {out[stat]['err_per_trigger']:.2e}"
+        acc = rows[0]["acc"]
+        out[stat] = dict(diff=d, err=e, z=d / e, rate_per_s=beta[-1], mu={k: beta[n] for n, k in enumerate(arms)},
+                         eff=eff[stat], spot_hits_per_trigger=d / eff[stat] / acc, err_per_trigger=e / eff[stat] / acc,
+                         per_trigger_2sigma_limit=(max(d, 0) + 2 * e) / eff[stat] / acc)
+        print(f"{stat:4s}: on-off = {d:+.3f} +- {e:.3f} per readout (z {d / e:+.2f}); background {beta[-1]:.2f} hits/s; "
+              f"spot hits/trigger {out[stat]['spot_hits_per_trigger']:+.2e} +- {out[stat]['err_per_trigger']:.2e}"
               f" (2-sigma limit {out[stat]['per_trigger_2sigma_limit']:.2e})")
-    # beam level today (short-gate arm vs off arm), local-annulus estimate per s of gate-open
+    # readout interval per arm (the dead-time difference the regression corrects for)
     print("dt per arm:", {k: round(np.mean([x["dt"] for x in rows if x["arm"] == k]), 3) for k in arms})
     fig_dir = pathlib.Path(a.folder) / "figures"
     (fig_dir / "analysis.json").write_text(json.dumps(ht._jsonable(out), indent=1))
