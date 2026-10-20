@@ -85,3 +85,23 @@ Remote session(s) by the photon-hunter agent. Newest entries at the bottom. Data
 - Figures: troubleshoot_figures/agent_exp3_20261020_152224/ (window_scan.png, delay_scan_*.png).
 - Code: window_scan.py now scores with the drift-corrected net hits (tested offline on exp3 runs:
   reproduces 1827 ns +0.77, z 2.9).
+
+### E4 (15:47-16:14) 500 ns windows, 27-5027 ns, interleaved (window_scan.py --tag exp4)
+- Hypothesis: since the background is mostly ungated (E3), wider windows cost little; 500 ns
+  windows cover 5 us with the same per-window sensitivity as E3.
+- Settings: gain 9000, 10 windows of 500 ns (27 ... 4527 ns), 50,000 acc (25 ms gate-open per
+  readout), 6 passes x 12 readouts shuffled -> 72 readouts per window.
+- Result (drift-free net spot hits per readout, r<=10): -1.40 .. -0.21 for all windows; best 527 ns
+  at +1.3 sigma vs the others (527 ns was best in passes 1, 5, 6 at +1.3..+1.6; never > 2 sigma).
+  Raw hits still rise with delay (7.5 at 27 ns -> 9.8 at 4527 ns) and r<=20 shows 4527 at +3.8:
+  that is the dead-time effect below, not light.
+- Camera-side check (free from the timing): readout interval = 1.70 s + 1.17 x (delay x 50k).
+  Slope ~1 means every gate blocks triggers for about its delay, i.e. the camera does open one
+  gate per trigger at the programmed delay. Longer delay -> fewer gates/s -> longer readout ->
+  more ungated background per readout. This is why raw scores rise with delay.
+- Source drift: the trigger rate fell through the session: ~38-43 kHz (14:58-15:15), ~36-38 kHz
+  (15:23), ~29 kHz (15:50) and ~22-26 kHz (16:10) (from 50k acc per readout timing, dead time
+  removed). Together with the beam fading 30x since 12:21 this suggests the pump power or the
+  SPDC/idler alignment is drifting down, not only Tristan's pump change.
+- Conclusion: no heralded window between 27 ns and 5027 ns at this sensitivity.
+- Figures: troubleshoot_figures/agent_exp4_20261020_154719/.
