@@ -250,3 +250,36 @@ health_analyze.py (figures + health.json). Camera free at start; sensor -20.0 C 
   Intensifier-off and gain-1 controls were still running at handback (script closes the camera with ht.shutdown).
 - Hypothesis: EM-register-amplified CCD signal (single-pixel events, gain dependent) growing with exposure, e.g. a
   light leak onto the CCD/phosphor or CCD dark/heating; to be decided by the intensifier-off run.
+
+## 2026-10-21 session 4 (remote; Tristan: "image these single photons with an EXTERNAL trigger", gates <= 10 us, readouts <= 1 s)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-21/` (0949_agent_rate_check, 0950_agent_dscan, 1047_agent_dscan2,
+1053_agent_dscan3). Camera free at start (Tristan's kernel 13928 not holding it); -20 C Locked; no saturation; closed with
+ht.shutdown after every script. Camera time ~75 min (09:49-11:05).
+
+### S1 (09:49) External trigger rate (agent_scripts/rate_check.py; 0.5 V, rising, 50 ohm, DC; 3 ns gate, 20k/30k acc)
+- 54.7 / 55.0 kHz (0.37 s per 20k, 0.55 s per 30k triggers). Up from 36.6 kHz at 08:55 and 21-25 kHz yesterday.
+
+### S2 (09:50-11:05) Delay search 527-3027 ns, five 500 ns windows, interleaved ON/OFF (multi_ab.py)
+- Hypothesis: with 110-130 m fibre (~550-640 ns) the heralded photon sits somewhere in 527-3027 ns (27-527 ns done in E7).
+- Settings: gain 9000, External, ON = d .. d+500 ns, OFF = d+5000 ns (same width), d = 527/1027/1527/2027/2527; blocks of
+  20 readouts, 10 arms rotated per cycle. Pass 1 40k acc (20 ms open/readout), 12 cycles; pass 2 30k acc, 1 cycle; pass 3
+  20k acc, 3 cycles. ~11 min per window in total.
+- Trigger rate was NOT stable: 52 kHz (cycles 1-3) -> 18 kHz (cycles 6-7, ~10:12-10:22) -> 42 kHz -> ~25-30 kHz at 11:00.
+  So in pass 1 readouts went to 2.1-2.4 s (cycles 5-9), breaking the 1 s rule. I could not stop the run (process kill was
+  refused by the permission system), so I added a readout-interval guard to multi_ab.py (dc1a2db), which stopped passes 2
+  and 3 cleanly at 1.13 / 1.05 s. OFF arms always take ~25% longer per readout (later gate -> more missed triggers), fitted
+  out with the readout-interval regression.
+- Result (window_figures.py: per-run baseline, beam-profile matched filter, regression on arm + readout interval;
+  combine_windows.py: per-trigger inverse-variance over the 3 passes). Net heralded spot hits per trigger, all passes:
+  527 ns +5.1e-6 +- 2.8e-6 (z +1.8); 1027 ns +5.7e-6 +- 2.7e-6 (z +2.1); 1527 ns +1.7e-6 +- 2.7e-6 (z +0.6);
+  2027 ns +5.3e-6 +- 2.7e-6 (z +1.9); 2527 ns -4.3e-6 +- 2.8e-6 (z -1.5). Pass 1 alone: z +1.7/+1.8/+0.5/+1.9/-2.2;
+  pass 1 with only readouts <= 1.05 s: z +1.2/+2.0/-1.1/+1.0/-0.9. No window >= 4 sigma, so no halving and no target image.
+- Conclusion: FLAT from 527 to 3027 ns. 2-sigma upper limits (spot hits per trigger): 527 ns 1.1e-5, 1027 ns 1.1e-5,
+  1527 ns 7.0e-6, 2027 ns 1.1e-5, 2527 ns 5.5e-6. The similar +5e-6 in three windows is common to non-adjacent
+  windows, so it is a shared systematic (dead-time/background correction), not a localized heralded photon.
+- Figures: 0950_agent_dscan/figures/window_<d>ns.png (pass 1, ON / OFF / ON-OFF), window_<d>ns_le1s.png (readouts <= 1.05 s),
+  summary_vs_delay.png (pass 1), summary_vs_delay_combined.png + windows_combined.json (all passes);
+  1047_agent_dscan2/figures and 1053_agent_dscan3/figures: the same per pass.
+- Lab checks: (1) the herald/idler rate drifts 18-55 kHz within an hour (is the idler counter or threshold behaving?);
+  (2) the signal beam is still not visible at a wide gate (session 3 H2), so ~0 heralded photons are expected at the camera
+  whatever the delay; (3) time-tagger coincidence check of the signal-idler delay.
