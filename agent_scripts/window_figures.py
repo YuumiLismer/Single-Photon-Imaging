@@ -26,6 +26,12 @@ p.add_argument("folder"); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454))
 p.add_argument("--max-dt", type=float, default=None, help="drop runs with readout interval above this (s)")
 p.add_argument("--suffix", default="", help="appended to figure/json names")
+p.add_argument("--method", choices=("control", "regress"), default="control",
+               help="control (default since session 5): per-readout matched filter minus the same template at 4 control "
+                    "positions (+-45 px), ON minus OFF with Welch errors. regress: old arm + readout-interval regression, "
+                    "needed only when readouts were long (>1 s) and the ungated background depended on wall time")
+p.add_argument("--skip", nargs="*", default=[], help="arms to leave out of the fit, e.g. on27 off27 (session 5: the 27 ns gate "
+               "did not open, so its short readouts distorted the shared readout-interval term)")
 a = p.parse_args()
 folder = pathlib.Path(a.folder); figs = folder / "figures"
 runs = [r for r in ht.load_runs(str(folder)) if "_c" in r["meta"]["settings"]["label"] and r["roi_stack"].size]
@@ -34,14 +40,20 @@ if a.max_dt:
     print(len(runs), "runs kept with readout interval <=", a.max_dt, "s")
 roi = runs[0]["meta"]["roi"]; x0, y0, n = roi
 w, rr = beam_template(roi, tuple(a.spot)); prof = w / w.sum(); eff_mf = (w * prof).sum()
-rows, img = [], {}
+ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]
+rows, img, per = [], {}, {}
 for r in runs:
     st = ht.above_pedestal(r); hit = (st - np.median(st, axis=0)) >= a.thr
     arm = arm_of(r); s = r["meta"]["settings"]
+    if arm in a.skip:
+        continue
     rows.append(dict(arm=arm, n=len(hit), dt=ht.readout_interval_s(r), h10=hit[:, rr <= 10].sum(1).mean(),
                      mf=(hit * w).sum((1, 2)).mean(), acc=int(r["meta"]["actual"]["accumulations"]),
                      delay=float(s["gate_delay_ns"]), width=float(s["gate_width_ns"]), gain=int(s["gain"])))
     sm, k = img.get(arm, (0, 0)); img[arm] = (sm + hit.sum(0), k + len(hit))
+    c = np.mean([(hit * cw).sum((1, 2)) for cw in ctrl], 0)
+    per.setdefault(arm, {"mf": [], "h10": []})
+    per[arm]["mf"].append((hit * w).sum((1, 2)) - c); per[arm]["h10"].append(hit[:, rr <= 10].sum(1))
 arms = sorted({x["arm"] for x in rows})
 X = np.array([[x["arm"] == k for k in arms] + [x["dt"]] for x in rows], float); W = np.sqrt([x["n"] for x in rows])
 
@@ -54,7 +66,7 @@ def fit(stat):
     return beta, cov
 
 
-fits = {s: fit(s) for s in ("mf", "h10")}
+fits = {s: fit(s) if a.method == "regress" else (None, None) for s in ("mf", "h10")}
 wins = sorted({int(re.sub(r"\D", "", k)) for k in arms if k.startswith("on")})
 out = []
 for d in wins:
@@ -63,7 +75,12 @@ for d in wins:
         continue
     i, j = arms.index(on), arms.index(off); res = {}
     for s, (beta, cov) in fits.items():
-        diff = beta[i] - beta[j]; err = np.sqrt(cov[i, i] + cov[j, j] - 2 * cov[i, j]); res[s] = (diff, err)
+        if a.method == "regress":
+            diff = beta[i] - beta[j]; err = np.sqrt(cov[i, i] + cov[j, j] - 2 * cov[i, j])
+        else:
+            x, y = np.concatenate(per[on][s]), np.concatenate(per[off][s])
+            diff = x.mean() - y.mean(); err = np.hypot(x.std(ddof=1) / np.sqrt(len(x)), y.std(ddof=1) / np.sqrt(len(y)))
+        res[s] = (diff, err)
     R = [x for x in rows if x["arm"] == on]; Roff = [x for x in rows if x["arm"] == off]
     acc = R[0]["acc"]; nro = sum(x["n"] for x in R); width = R[0]["width"]; gain = R[0]["gain"]
     net, err = res["mf"][0] / eff_mf, res["mf"][1] / eff_mf
