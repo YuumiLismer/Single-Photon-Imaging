@@ -3,7 +3,11 @@
     python agent_scripts/multi_ab.py --arm on:27:5000:12 --arm off:15027:5000:12 \
         --arm short:15027:50:6 --acc 50000 --cycles 20 --max-minutes 38 --tag wide_ab
 
-Each --arm is name:delay_ns:width_ns:readouts_per_block. Every cycle takes one block of each arm,
+Each --arm is name:delay_ns:width_ns:readouts_per_block[:opt...]. Options (session 6, to diagnose the External
+gate-end quirk): I = Internal trigger at --internal-hz, F = falling edge, AC = AC coupling, HZ = high-impedance
+termination, t<volts> = trigger threshold (e.g. t0.3), r<hz> = Internal trigger at this rate (e.g. r400000), g<gain> = emICCD gain for this arm (<= 9000),
+NC = 'Clean Until Trigger' off, FF = 'Readout Control Mode' Full Frame (default Frame Transfer) for this arm
+(set, read back, and restored to the default after the arm). Every cycle takes one block of each arm,
 order rotated per cycle so drifts hit all arms alike. Per readout it records photon-hit pixels
 (>= --thr ADU above the readout median) in apertures r<=6/10/15 px around --spot, the mean hit
 density at r > 50 px (the far field, for the drift-free 'net' score of agent_log E3), the
@@ -28,13 +32,30 @@ p.add_argument("--max-minutes", type=float, default=38); p.add_argument("--gain"
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454)); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--rate", action="store_true", help="measure the trigger rate first")
 p.add_argument("--tag", default="multi_ab")
+p.add_argument("--internal-hz", type=float, default=100_000, help="trigger rate of ':I' arms")
 p.add_argument("--max-readout-s", type=float, default=1.05,
                help="stop if a block's median readout interval exceeds this (Tristan: readouts <= 1 s wall-clock)")
 a = p.parse_args()
 arms = []
 for s in a.arm:
-    n, d, w, k = s.split(":")
-    arms.append(dict(name=n, delay=float(d), width=float(w), readouts=int(k)))
+    n, d, w, k, *opts = s.split(":")
+    ov = {}
+    for o in opts:
+        u = o.upper()
+        if u == "I": ov["trigger_source"] = "Internal"
+        elif u == "F": ov["trigger_edge"] = "Falling Edge"
+        elif u == "AC": ov["trigger_coupling"] = "AC"
+        elif u == "HZ": ov["trigger_termination"] = "High Impedance"
+        elif u.startswith("T"): ov["trigger_threshold_v"] = float(o[1:])
+        elif u.startswith("G"):
+            ov["gain"] = int(o[1:])
+            if ov["gain"] > ht.MAX_GAIN: sys.exit(f"arm {n}: gain above {ht.MAX_GAIN}")
+        elif u == "NC": ov["_attr:Clean Until Trigger"] = False
+        elif u == "FF": ov["_attr:Readout Control Mode"] = "Full Frame"
+        elif u.startswith("R"): ov["trigger_source"] = "Internal"; ov["internal_trigger_hz"] = float(o[1:])
+        else: sys.exit(f"arm {n}: unknown option {o}")
+    arms.append(dict(name=n, delay=float(d), width=float(w), readouts=int(k), overrides=ov,
+                     source=ov.get("trigger_source", "External")))
     if float(w) * 1e-9 * a.acc > ht.MAX_GATE_OPEN_S:
         sys.exit(f"arm {n}: gate-open time per readout above the safety limit")
 spot = tuple(a.spot)
@@ -77,6 +98,25 @@ def summary():
     return out
 
 
+ATTR_DEFAULTS = {"Clean Until Trigger": True, "Readout Control Mode": "Frame Transfer"}
+
+
+def set_attr(name, value):
+    """Set a camera attribute (bool or enum label), commit, and check the read-back."""
+    import camera_control as cc
+    if isinstance(value, bool):
+        cc.safe_set_attribute_value(cam, name, value)
+    else:
+        ok, err = ht._set_enum(cam, cam.get_all_attributes(), name, value)
+        if not ok:
+            raise RuntimeError(f"could not set {name} = {value}: {err}")
+    cc.safe_commit_parameters(cam)
+    got = cam.get_attribute_value(name)
+    if str(got) != str(value):
+        raise RuntimeError(f"{name} read-back {got!r} != {value!r}")
+    print(f"  {name} -> {got} (read back)")
+
+
 cam, limits = ht.open_camera()
 t0 = datetime.datetime.now()
 try:
@@ -87,8 +127,18 @@ try:
     for c in range(a.cycles):
         k = c % len(arms)
         for m in arms[k:] + arms[:k]:
-            r = ht.take_run(cam, **{**base, "label": f"{a.tag}_{m['name']}_{m['delay']:g}ns_c{c + 1}",
-                                    "gate_delay_ns": m["delay"], "gate_width_ns": m["width"], "n_readouts": m["readouts"]})
+            ov = {k: v for k, v in m["overrides"].items() if not k.startswith("_")}
+            extra = {k[6:]: v for k, v in m["overrides"].items() if k.startswith("_attr:")}
+            for k, v in extra.items():
+                set_attr(k, v)
+            try:
+                r = ht.take_run(cam, **{**base, "label": f"{a.tag}_{m['name']}_{m['delay']:g}ns_c{c + 1}",
+                                        "gate_delay_ns": m["delay"], "gate_width_ns": m["width"], "n_readouts": m["readouts"],
+                                        "notes": base["notes"] + "".join(f" | {k} = {v}" for k, v in extra.items()),
+                                        **{"internal_trigger_hz": a.internal_hz, **ov}})
+            finally:
+                for k in extra:
+                    set_attr(k, ATTR_DEFAULTS[k])
             if r is None:
                 raise RuntimeError("no readouts (triggers stopped?)")
             if float((r["first"] >= ht.SATURATION_ADU).mean()) > 1e-3:
@@ -105,6 +155,11 @@ try:
         if (datetime.datetime.now() - t0).total_seconds() > a.max_minutes * 60:
             print("time limit reached"); break
 finally:
+    for k in {k[6:] for m in arms for k in m["overrides"] if k.startswith("_attr:")}:
+        try:
+            set_attr(k, ATTR_DEFAULTS[k])
+        except Exception as e:
+            print(f"WARNING: could not restore {k}:", e)
     ht.shutdown(cam)
     (folder / "records.json").write_text(json.dumps(dict(args=vars(a), arms=arms, records=rec)))
     done = [m["name"] for m in arms if imgs[m["name"]][1]]
