@@ -303,3 +303,22 @@ Camera free at start; -20 C Locked; no saturation; ht.shutdown after every scrip
   that is 7e-5..7e-4 per trigger, 5-50x above the session 2-4 limits -> a 500 ns window should give 5 sigma in
   ~20-60 readouts of 30k acc.
 - Figure: 1400_agent_beam5_2/figures/beam.png, beam.json.
+
+### D1 (14:03-14:09) Delay search 27-3027 ns, six 500 ns windows, ON/OFF interleaved (multi_ab.py --tag dscan5)
+- Settings: gain 9000, External, 30,000 acc (15 ms open/readout), ON = d..d+500 ns, OFF = d+5000 ns, d = 27..2527;
+  blocks of 20, 12 arms rotated, 3 cycles -> 60 readouts per arm; 0.24-0.34 s (ON) / 0.41-0.48 s (OFF) per readout
+  (trigger rate ~90-120 k gates/s; no readout near the 1 s limit).
+- Analysis: window_figures.py, new default estimator (matched filter minus 4 control apertures, ON-OFF, Welch errors;
+  the old readout-interval regression is collinear with short readouts and gave -2..-4 sigma everywhere).
+- Result (net spot hits/readout, z): 527 ns +1.58 +- 0.43 (z +3.7); 1027 -0.48 +- 0.42; 1527 -0.48 +- 0.49;
+  2027 -0.43 +- 0.48; 2527 +0.85 +- 0.44 (+1.9). Net image at 527 ns: compact red spot exactly on (501, 454).
+- NEW, important: the 27-527 ns ON gate collects NO light at all, not even the stray scene (far field 0.59e-3 hits/px
+  = the closed-gate floor, vs 2.5e-3 in every other gate; core 0.07 vs 1.5-2 hits). Read-back is correct
+  (27 ns, 500 ns, External). With the External trigger, gates that end before ~527 ns after the trigger do not open.
+- Figures: 1403_agent_dscan5/figures/window_<d>ns.png, summary_vs_delay.png, windows.json.
+
+### D2 (14:10-14:17) 250 ns ladder (multi_ab.py --tag ladder250)
+- Settings: 50,000 acc, ON 277/527/777 ns + 250 ns, OFF +5000 ns, 5 cycles -> 100 readouts per arm (0.39-0.44 s ON).
+- Result: 527-777 ns +2.34 +- 0.43 spot hits/readout, z +5.5 (4.7e-5 per trigger); 777-1027 -0.20 +- 0.34 (z -0.6);
+  277-527 again dark (far field 0.94e-3 vs 3.0-3.6e-3: the gate does not open).
+- Figures: 1410_agent_ladder250/figures/window_527ns.png, summary_vs_delay.png.
