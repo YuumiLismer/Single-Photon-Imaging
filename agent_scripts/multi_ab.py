@@ -28,6 +28,8 @@ p.add_argument("--max-minutes", type=float, default=38); p.add_argument("--gain"
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454)); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--rate", action="store_true", help="measure the trigger rate first")
 p.add_argument("--tag", default="multi_ab")
+p.add_argument("--max-readout-s", type=float, default=1.05,
+               help="stop if a block's median readout interval exceeds this (Tristan: readouts <= 1 s wall-clock)")
 a = p.parse_args()
 arms = []
 for s in a.arm:
@@ -92,6 +94,10 @@ try:
             if float((r["first"] >= ht.SATURATION_ADU).mean()) > 1e-3:
                 raise RuntimeError("saturation > 0.1%: stopping")
             score(m["name"], r, c + 1)
+            dt_blk = ht.readout_interval_s(r)
+            if dt_blk > a.max_readout_s:
+                raise RuntimeError(f"readout interval {dt_blk:.2f} s > {a.max_readout_s} s (trigger rate dropped?): "
+                                   "stopping; rerun with fewer --acc")
         s = summary()
         print(f"CYCLE {c + 1}: " + json.dumps(ht._jsonable({k: ({kk: round(float(vv), 3) for kk, vv in v.items()}
                                                                  if isinstance(v, dict) else round(float(v), 2)) for k, v in s.items()})), flush=True)

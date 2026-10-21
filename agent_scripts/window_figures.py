@@ -24,9 +24,14 @@ from analyze_ab import beam_template, arm_of
 p = argparse.ArgumentParser()
 p.add_argument("folder"); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454))
+p.add_argument("--max-dt", type=float, default=None, help="drop runs with readout interval above this (s)")
+p.add_argument("--suffix", default="", help="appended to figure/json names")
 a = p.parse_args()
 folder = pathlib.Path(a.folder); figs = folder / "figures"
 runs = [r for r in ht.load_runs(str(folder)) if "_c" in r["meta"]["settings"]["label"] and r["roi_stack"].size]
+if a.max_dt:
+    runs = [r for r in runs if ht.readout_interval_s(r) <= a.max_dt]
+    print(len(runs), "runs kept with readout interval <=", a.max_dt, "s")
 roi = runs[0]["meta"]["roi"]; x0, y0, n = roi
 w, rr = beam_template(roi, tuple(a.spot)); prof = w / w.sum(); eff_mf = (w * prof).sum()
 rows, img = [], {}
@@ -84,7 +89,7 @@ for d in wins:
                  f"{nro} ON + {rec['readouts_off']} OFF readouts, External trigger\n"
                  f"net spot hits/readout {net:+.2f} +- {err:.2f}  ->  z = {net / err:+.1f}   "
                  f"(cyan circle = spot (501, 454), r = 10 px; >= 4 = candidate, >= 5 = detection)")
-    fig.tight_layout(); fig.savefig(figs / f"window_{d}ns.png", dpi=100); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figs / f"window_{d}ns{a.suffix}.png", dpi=100); plt.close(fig)
     print(f"{d:5d} ns: net {net:+.3f} +- {err:.3f} spot hits/readout, z {net / err:+.2f} | r<=10 {res['h10'][0]:+.3f} +- {res['h10'][1]:.3f}"
           f" | {nro} readouts, {rec['s_per_readout_on']:.2f} s/readout | 2-sigma limit {rec['limit_2sigma_per_trigger']:.1e}/trigger")
 if out:
@@ -96,5 +101,5 @@ if out:
         ax.annotate(f"z {o['z']:+.1f}", (x, o["net_spot_per_readout"] + o["err"]), ha="center", va="bottom", fontsize=9)
     ax.set_xlabel("gate window after the herald trigger (ns)"); ax.set_ylabel("net spot hits per readout (ON - OFF)")
     ax.set_title(f"Heralded-photon search, {out[0]['width']:g} ns gates, {out[0]['acc']:,} triggers/readout, gain {out[0]['gain']}")
-    fig.tight_layout(); fig.savefig(figs / "summary_vs_delay.png", dpi=110); plt.close(fig)
-(figs / "windows.json").write_text(json.dumps(ht._jsonable(out), indent=1))
+    fig.tight_layout(); fig.savefig(figs / f"summary_vs_delay{a.suffix}.png", dpi=110); plt.close(fig)
+(figs / f"windows{a.suffix}.json").write_text(json.dumps(ht._jsonable(out), indent=1))
