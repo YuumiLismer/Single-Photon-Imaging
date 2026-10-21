@@ -217,3 +217,36 @@ The 20 Oct runs and figures were moved from `data/raw/troubleshoot` and
   (2) find and block the stray light (room lights/LEDs/pump scatter lighting the mount around the fibre
   output; cover the camera-to-fibre path); (3) the coincidence/delay check on the time tagger with an APD
   (session 1 list); (4) trigger rate fell again 25.4 -> 21.4 kHz in 1 h.
+
+## 2026-10-21 session 3 (remote; Tristan: "try it with an internal trigger" / "just see if the camera works")
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-21/` (0855_agent_health_timing, 0856_agent_health_switch,
+0857_agent_health_gain_gate, 0911_agent_health_closed_bg). Scripts: agent_scripts/health_check.py (acquire),
+health_analyze.py (figures + health.json). Camera free at start; sensor -20.0 C Locked throughout; no saturated pixels.
+
+### H1 (08:55) Internal trigger takes
+- Read-back Trigger Source = Internal / Frequency as set on every run; switching External <-> Internal twice works
+  (read-back follows, timing follows). Readout interval = accumulations / rate to 0.1 %: 0.501, 1.001, 2.001 s at 1 kHz
+  (500/1000/2000 acc), 1.001 s at 10 kHz x 10k and 100 kHz x 100k; floor 0.226 s = readout time (frame transfer).
+- External (APD) in between: 0.546 s per 20k acc -> >= 36.6 kHz triggers (up from 21.4 kHz at 18:00 yesterday).
+- Pedestal 640 ADU, read noise ~10 ADU (gain 1). Figure: 0856_agent_health_switch/figures/timing.png.
+
+### H2 (08:57-09:10) Intensifier response, gate closing, single photons (internal, gate delay 27 ns)
+- Gain (10 kHz x 10k acc, 10 us gate = 0.1 s open, minus 3 ns gate): in-gate light 6.6, 16.2, 28.6, 41.4 ADU/px/readout at
+  gain 1000/3000/6000/9000 (~proportional; 0.3 +- 1.0 at 100). Read-back sub-gains: ADC Quality "Electron Multiplied",
+  emICCD gain mode Optimal (EM register is in use).
+- Gate (gain 9000, 1 s wall): hit px/px 0.0063 (3 ns), 0.0068 (100 ns), 0.0088 (1 us), 0.030 (10 us), 0.116 (50 us):
+  linear in gate-open time, ~0.22-0.24 hits/px per s open. Same 0.1 s open at 1 / 10 / 100 kHz: 0.029 / 0.030 / 0.030,
+  and 3 ns gates at 1 vs 100 kHz equal: the gate opens and closes properly; the number of gates does not matter.
+- Events: open-gate events are multi-pixel blobs (median 3 px, peak 253 ADU, summed 532 ADU, long charge tail) = intensifier
+  photon events; closed-gate events are mostly SINGLE pixels (median 1 px, summed 280 ADU) -> not photocathode events.
+- Beam: no compact spot at (501, 454). Core(r<6) minus annulus(10-16) = -6,700 +- 1,000 ADU per s gate-open (0.5 s runs)
+  vs +123,000 at 12:21 (high pump) and -2,700 with the arm blocked. The scene is the session-2 stray-light scene (mount,
+  bright ring, dark centre at the spot, stripes, blob ~(756, 446)); no compact spot elsewhere beyond scene structure.
+- Figures: 0857_agent_health_gain_gate/figures/{gain,gate,full_frame,single_photons,events}.png, health.json.
+
+### H3 (09:11-, in progress at handback) Closed-gate background vs wall time
+- 3 ns gate, gain 9000, 1 kHz: hits/readout (ROI) 13, 40, 126, 476, 1005 at 0.25, 0.5, 1, 2, 3 s (4 s: ~1650 in H2);
+  ROI mean rises 635 -> 697 ADU. SUPERLINEAR (~t^1.8), not proportional to time, independent of gate count.
+  Intensifier-off and gain-1 controls were still running at handback (script closes the camera with ht.shutdown).
+- Hypothesis: EM-register-amplified CCD signal (single-pixel events, gain dependent) growing with exposure, e.g. a
+  light leak onto the CCD/phosphor or CCD dark/heating; to be decided by the intensifier-off run.
