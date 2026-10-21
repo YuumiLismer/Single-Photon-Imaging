@@ -27,6 +27,15 @@ p.add_argument("--acc", type=int, default=80000); p.add_argument("--cycles", typ
 p.add_argument("--block", type=int, default=50); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--max-readout-s", type=float, default=1.05); p.add_argument("--tag", default="target")
 p.add_argument("--analyse", default=None, help="only re-analyse this experiment folder")
+p.add_argument("--baseline", choices=("readout", "pixel"), default="readout",
+               help="readout (default since session 6): hit = ADU above each readout's own pedestal. pixel: also subtract "
+                    "each pixel's median over the run's readouts (old default); with a compact spot and strong heralded "
+                    "signal (session 6: ~12 hits/readout in r<=10) the spot pixels' medians rise to ~200 ADU and about "
+                    "half the photons are lost")
+p.add_argument("--off-shift", type=float, default=5000.0, help="OFF gate = ON gate + this (ns)")
+p.add_argument("--rate-band", type=float, default=None,
+               help="readout post-selection: keep readouts whose interval is within this fraction of the arm's median "
+                    "(drops readouts taken while the herald rate spiked/dropped); figures get suffix _band<x>")
 a = p.parse_args()
 SPOT = (501, 454)
 
@@ -60,7 +69,7 @@ else:
                 if arm == "on":
                     r = ht.take_run(cam, **{**base, "label": f"{a.tag}_on_c{c + 1}"})
                 else:
-                    r = ht.take_offdelay_background(cam, {**base, "label": f"{a.tag}_c{c + 1}"}, shift_ns=5000.0,
+                    r = ht.take_offdelay_background(cam, {**base, "label": f"{a.tag}_c{c + 1}"}, shift_ns=a.off_shift,
                                                     label=f"{a.tag}_off_c{c + 1}")
                 if r is None:
                     raise RuntimeError("no readouts")
@@ -80,10 +89,21 @@ eff = (w * w / w.sum()).sum()
 ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]
 
 
+def readout_dts(r):
+    t = np.asarray(r["t"], float); dt = np.diff(t)
+    return np.concatenate([[np.median(dt) if len(dt) else np.nan], dt])
+
+
 def hits_all(rs):
     H, M = 0, []
+    med = np.median(np.concatenate([readout_dts(r)[1:] for r in rs])) if a.rate_band else None
     for r in rs:
-        st = ht.above_pedestal(r); hit = (st - np.median(st, 0)) >= a.thr
+        st = ht.above_pedestal(r)
+        hit = ((st - np.median(st, 0)) if a.baseline == "pixel" else st) >= a.thr
+        if a.rate_band:
+            hit = hit[np.abs(readout_dts(r)[:len(hit)] / med - 1) <= a.rate_band]
+            if not len(hit):
+                continue
         H = H + hit.sum(0)
         M.append(((hit * w).sum((1, 2)) - np.mean([(hit * c).sum((1, 2)) for c in ctrl], 0)) / eff)
     M = np.concatenate(M)
@@ -97,15 +117,19 @@ err = np.hypot(Mon.std(ddof=1) / np.sqrt(len(Mon)), Moff.std(ddof=1) / np.sqrt(l
 act = S["meta"]["actual"]
 acc = int(act["accumulations"]); delay = float(act["gate_delay_ns"]); width = float(act["gate_width_ns"])
 dts = [ht.readout_interval_s(r) for r in ons]
-res = dict(delay=delay, width=width, acc=acc, readouts_on=len(Mon), readouts_off=len(Moff),
+sfx = (f"_{a.baseline}" if a.analyse else "") + (f"_band{a.rate_band:g}" if a.rate_band else "")
+dts_off = [ht.readout_interval_s(r) for r in offs]
+wall = len(Mon) * float(np.median(dts)) + len(Moff) * float(np.median(dts_off))
+res = dict(delay=delay, width=width, acc=acc, readouts_on=len(Mon), readouts_off=len(Moff), baseline=a.baseline,
+           rate_band=a.rate_band, readout_wall_s=wall, z_per_sqrt_min=(net / err) / np.sqrt(wall / 60),
            net_spot_hits_per_readout=net, err=err, z=net / err, per_trigger=net / acc,
            on_spot=Mon.mean(), off_spot=Moff.mean(), gates_per_s=float(acc / np.median(dts)),
            s_per_readout_on=float(np.median(dts)), heralded_spot_hits_per_s_wall=float(net / np.median(dts)))
 print(json.dumps(ht._jsonable(res), indent=1))
 fig_dir = exp / "figures"; fig_dir.mkdir(exist_ok=True, parents=True)
-(fig_dir / "target.json").write_text(json.dumps(ht._jsonable(res), indent=1))
+(fig_dir / f"target{sfx}.json").write_text(json.dumps(ht._jsonable(res), indent=1))
 
-for fn, kw in ((ht.plot_run, dict(dark=D, spot=SPOT, save_as="target_plot_run")),
+for fn, kw in () if a.analyse else ((ht.plot_run, dict(dark=D, spot=SPOT, save_as="target_plot_run")),
                (ht.plot_raw_vs_accumulated, dict(dark=D, save_as="target_raw_vs_sum")),
                (ht.plot_wiener, dict(dark=D, save_as="target_wiener"))):
     try:
@@ -115,19 +139,21 @@ for fn, kw in ((ht.plot_run, dict(dark=D, spot=SPOT, save_as="target_plot_run"))
     except Exception as e:
         print(f"  {fn.__name__} failed: {type(e).__name__}: {e}")
 try:
+    if a.analyse:
+        raise RuntimeError("skipped in --analyse mode")
     df, best = ht.threshold_sweep(S, D, spot=SPOT, save_as="target_threshold_sweep"); plt.close("all")
     res["best_threshold_adu"] = best
     print(df.to_string()); print("best threshold", best)
 except Exception as e:
     print(f"  threshold_sweep failed: {type(e).__name__}: {e}")
-(fig_dir / "target.json").write_text(json.dumps(ht._jsonable(res), indent=1))
+(fig_dir / f"target{sfx}.json").write_text(json.dumps(ht._jsonable(res), indent=1))
 
 x0, y0, n = S["meta"]["roi"]
 ext = (x0 - .5, x0 + n - .5, y0 + n - .5, y0 - .5)
 fig, ax = plt.subplots(1, 3, figsize=(16.5, 5.4))
 vmax = np.percentile(gaussian_filter(Hon, 1), 99.7)
 panels = ((ax[0], Hon, f"ON gate {delay:g}-{delay + width:g} ns after the herald"),
-          (ax[1], Hoff, f"OFF gate {delay + 5000:g}-{delay + 5000 + width:g} ns (off-delay background)"))
+          (ax[1], Hoff, f"OFF gate {delay + a.off_shift:g}-{delay + a.off_shift + width:g} ns (off-delay background)"))
 for a_, im, t in panels:
     h = a_.imshow(gaussian_filter(im, 1), cmap="inferno", vmin=0, vmax=vmax, extent=ext)
     a_.set_title(t + "\nphoton hits per pixel per readout (1 px smooth)", fontsize=10)
@@ -142,5 +168,5 @@ for a_ in ax:
 fig.suptitle(f"Heralded single-photon image, PI-MAX4 emICCD, {S['meta']['started'][:16]}: External herald trigger "
              f"(~{res['gates_per_s'] / 1e3:.0f} k gates/s), gain 9000, gate {delay:g} ns + {width:g} ns, {acc:,} acc/readout, "
              f"{len(Mon)} ON + {len(Moff)} OFF readouts, hit threshold {a.thr:g} ADU, ROI 150x150", fontsize=10)
-fig.tight_layout(); fig.savefig(fig_dir / "heralded_single_photon_image.png", dpi=130)
+fig.tight_layout(); fig.savefig(fig_dir / f"heralded_single_photon_image{sfx}.png", dpi=130)
 print("EXP", exp)
