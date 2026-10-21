@@ -384,3 +384,57 @@ Camera free at start; -20 C Locked; no saturation; ht.shutdown after every scrip
   delay), FWHM < ~5 ns. Target image z = 12.1 at 542 + 40 ns. Herald rate swung 50-215 k gates/s during the session.
 - Camera quirk: with the External herald, gates that end earlier than ~560-577 ns after the trigger never open.
   The 10 ns / 25 ns fine scans were blind for that reason. Any short gate must end >= ~580 ns.
+
+## 2026-10-21 session 6 (remote; goal: narrowest gate that still images the heralded photons)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-21/` 1717_agent_attrs ... 1757_agent_narrow6. Camera 17:17-18:00
+(~45 min), -20 C Locked, no saturation, ht.shutdown after every script; all changed settings read back and restored.
+
+### R1 (17:19) Re-check (1719_agent_recheck6): herald 208 kHz (3 ns gate); 542+40 ns ON/OFF, 60k acc, 40+40 readouts: z 8.4. Spot still there.
+### R2 (17:31) Trigger rate vs threshold (agent_scripts/threshold_rate.py, 1731_agent_thr_rate): flat 233 kHz from 0.2 to 1.3 V.
+  The herald pulses are now well above 1.3 V (no longer marginal at 0.5 V); the rate is real pulses, not threshold noise.
+
+### Q: the External gate-end quirk (runs gatefire, gateend6, intrate6, noclean6, fullframe6, gain6, cutofftime6)
+- Internal trigger (50, 100, 200, 400 kHz): 27-527 ns and every other gate open normally. External: 27-527 never opens.
+  => specific to the External trigger path, not to the gate pulser rate.
+- End scan, start 27 ns (spot hits r<=10 per readout, open ~20): end 517-547 -> 0; 557 -> 2; 567 -> 12; 577 -> 19; 587 -> 22.
+  Start 400 ns gives the same cutoff (ends 527/547 dark, 567 partial): it is the gate END that matters.
+- No setting changes it: falling edge, threshold 0.3 / 0.8 V, AC coupling, high-impedance termination, Clean Until
+  Trigger off, Full Frame readout, gain 3000/1000 all keep 27-527 dark and 27-577+ open. Gating Speed (Fast) and
+  Intensifier Options (None) are read-only; SyncMASTER off. Full attribute dump: 1717_agent_attrs/figures/attrs.json.
+- Per-readout it is all-or-nothing and switches in time: near the cutoff a run is either open or closed for whole
+  readouts, e.g. 27-557 ns at 20k acc: one block open for 7 readouts (~1.6 s) then closed, other blocks closed throughout.
+  Short gates are not partly open; the whole gate fires or not.
+- Best explanation: a camera-internal latency of ~550-575 ns in handling an External trigger (jittering / switching
+  between states over seconds, as if the trigger is re-synchronised to an internal clock); a gate that has to be
+  finished before that never fires. Not fixable from software. It is not caused by the herald signal level.
+
+### A: analysis fix (offline). window_figures/target_image used a per-pixel median baseline over each run's readouts;
+  with the stronger, compact spot it removed about half the heralded hits. Default is now the per-readout pedestal.
+  Session-5 target (542+40 ns) re-analysed: z 12.1 -> 17.0, 4.0e-5 -> 7.4e-5 heralded hits per trigger.
+
+### S: gate-start scan, end fixed at 587 ns (1738_agent_startscan6; 100k acc, 50 readouts/arm, shared OFF 1546+41 ns)
+- Net spot hits/readout: start 540-548 +8.8..+16.2 (z 10-14 each), 550 +2.9 +- 0.6, 552 +0.2, 554 -0.5, 556 -0.3.
+  => photons arrive at 548-550 ns (~80 % of them between 548 and 550, the rest 550-552): FWHM < ~2 ns
+  (step-limited). Heralded rate now ~1.2-1.8e-4 spot hits per trigger (2-4x session 5).
+- Same run: 546+31 (end 577) +13.8 +- 1.2 (z 11); 546+26 (end 572) +8.9 (~55 %, one block fully closed).
+- Arrival profile: 1751_agent_target31/figures/arrival_profile.png.
+
+### P: readout post-selection by trigger rate (window_figures/target_image --rate-band). Within runs the herald rate
+  is steady (target ON readouts 0.368-0.370 s); on the session-5 confirm run a 10 % band drops 2/3 of readouts and
+  z falls 7.1 -> 4.1 (signal per readout not higher in the kept ones). Does not help; off by default.
+
+### T2 (17:51-17:56) TARGET at 546 + 31 ns (agent_scripts/target_image.py, 1751_agent_target31)
+- External herald ~199 k gates/s, gain 9000, 120,000 acc/readout (3.7 ms open), OFF = +1 us (1546-1577 ns),
+  blocks of 50, 200 ON + 200 OFF readouts (0.60 / 0.73 s per readout), 4.5 min of readouts.
+- Net +21.4 +- 0.65 spot hits/readout, z = 33.0 (ON 22.8, OFF 1.4) = 1.8e-4 per trigger, ~36 heralded photons/s.
+  vs 40 ns session 5 (z 12.1 old baseline / 17.0 new in 4.6 min): z per sqrt(min) 15.7 vs 8.7.
+- Figures: heralded_single_photon_image.png, target_plot_run.png, target_threshold_sweep.png (best 58 ADU),
+  target_wiener.png, target_raw_vs_sum.png, arrival_profile.png.
+
+### N (17:57) Narrower gates (1757_agent_narrow6; 120k acc, 40 readouts each, shared OFF 1546+31)
+- 546+31 +25.6 +- 1.5 (z 16.9); 548+29 (end 577) +20.0 +- 1.2 (z 16.4); 548+26 (end 574) +10.3 +- 1.6 (z 6.3);
+  549+24 (end 573) +8.9 +- 1.3 (z 6.8). Below an end of ~577 ns the gate drops out for whole readouts.
+- Narrowest gate still imaging the photons: 24 ns (z 6.8 in 40 readouts, ~60 % of photons lost);
+  narrowest efficient gate: 29-31 ns ending at 577 ns.
+- A 3-10 ns gate needs the photons to arrive >= ~580 ns after the trigger: delay the signal by >= ~35 ns relative to
+  the herald (shorter herald coax by ~7 m, or ~7 m more signal fibre).
