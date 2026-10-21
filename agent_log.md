@@ -283,3 +283,23 @@ ht.shutdown after every script. Camera time ~75 min (09:49-11:05).
 - Lab checks: (1) the herald/idler rate drifts 18-55 kHz within an hour (is the idler counter or threshold behaving?);
   (2) the signal beam is still not visible at a wide gate (session 3 H2), so ~0 heralded photons are expected at the camera
   whatever the delay; (3) time-tagger coincidence check of the signal-idler delay.
+
+## 2026-10-21 session 5 (remote; Tristan in the lab: signal arm re-coupled, "increased the counts in the signal arm")
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-21/` (1400_agent_beam5 [stopped], 1400_agent_beam5_2, ...).
+Camera free at start; -20 C Locked; no saturation; ht.shutdown after every script.
+
+### B1 (14:00-14:04) Beam check, External trigger (agent_scripts/beam_check.py, new)
+- Hypothesis: after re-coupling, the compact signal spot is back (12:21 on 20 Oct: +123,000 ADU per s gate-open).
+- Trigger rate: 68.0 kHz (14:00), 66.4 kHz (14:01), 88.4 kHz (14:04) (20k acc x 3 ns gate).
+- First try stopped itself: 54k acc x 10 us took 1.36 s/readout, because a 10 us gate blocks triggers while
+  open (40 k gates/s at 68 kHz = R/(1+R*10 us)). Accumulations now come from the dead-time-corrected rate.
+- Settings: gain 9000, 31,000 acc; W = 27 ns + 10 us (0.31 s open), Woff = 10027 ns + 10 us, C = 3 ns gate;
+  3 cycles x 10 readouts per arm (0.66 / 0.97 / 0.36 s per readout).
+- Result: BEAM IS BACK, compact, still at (501, 454). Core(r<6) minus annulus(10-16): W-C +123,000 +- 15,000 ADU/s
+  gate-open (~230 detected photons/s at 532 ADU/photon; DoG z 99), Woff-C +117,000 +- 26,000 (same light: mostly
+  unheralded, as expected), W-Woff +6,900 +- 4,000 at the spot (1.7 sigma; if real, ~1.3e-4 heralded hits per gate).
+  Same in-gate stray scene as sessions 2-3 (mount square, blob (750, 450), column below), now with the spot on top.
+- Expectation: heralded hits/trigger = 230/s x (idler-side heralding efficiency) / trigger rate; for 2-20 % at 66 kHz
+  that is 7e-5..7e-4 per trigger, 5-50x above the session 2-4 limits -> a 500 ns window should give 5 sigma in
+  ~20-60 readouts of 30k acc.
+- Figure: 1400_agent_beam5_2/figures/beam.png, beam.json.
