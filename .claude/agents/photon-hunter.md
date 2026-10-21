@@ -51,6 +51,9 @@ test it on the camera, read the numbers and figures, change settings or code, re
 - emICCD gain <= 9000. Never exceed it.
 - Stop and back off if more than 0.1% of pixels saturate in any readout.
 - With gain above 1000, keep gate width x accumulations <= 1 s of gate-open time per readout.
+- Gate width <= 10,000 ns (Tristan, 21 Oct): longer gates image the stray-lit setup, not photons.
+- Keep each readout <= 1 s of wall-clock time: beyond that, background charge on the CCD (multiplied
+  by the EM stage, present even with the intensifier off) climbs steeply.
 - Keep the sensor at -20 C Locked. Never change the temperature set point.
 - Never ask for, or assume, physical actions: no blocking beams, cables, scopes or the pump.
   You cannot change the pump laser or the idler counter. If the remaining hypotheses all need a
