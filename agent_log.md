@@ -322,3 +322,28 @@ Camera free at start; -20 C Locked; no saturation; ht.shutdown after every scrip
 - Result: 527-777 ns +2.34 +- 0.43 spot hits/readout, z +5.5 (4.7e-5 per trigger); 777-1027 -0.20 +- 0.34 (z -0.6);
   277-527 again dark (far field 0.94e-3 vs 3.0-3.6e-3: the gate does not open).
 - Figures: 1410_agent_ladder250/figures/window_527ns.png, summary_vs_delay.png.
+
+### D3 (14:17-14:26) 25 ns gates 527-802 ns (multi_ab.py --tag fine25; 50k acc, 40 readouts per arm)
+- No window above +0.32 +- 0.21 spot hits/readout (all |z| < 1.6); sum of the 10 windows +0.75 +- 0.63 vs +2.34 +- 0.43
+  expected from D2. Taken during the herald-rate spike (150-190 kHz, see H below), when most triggers were probably
+  not idler photons, so the heralded fraction per trigger was diluted. Figures: 1417_agent_fine25/figures/.
+
+### P1 (14:27) Gate-opening probe, 1 us gates at 27..1027 ns and 5027 ns (--tag gateprobe, 10 readouts each)
+- All 1 us gates open (far field 3.9-4.4e-3 hits/px). So the dark gates of D1/D2 (27+500, 277+250) share only one
+  feature: they END at 527 ns. Working hypothesis: with this herald input, gates that close before ~530 ns after the
+  trigger are not opened (cause unknown; to be checked with 100 ns probes in D5).
+
+### D4 (14:29-14:38) Confirmation (--tag confirm, 40k acc; stopped by the 1.05 s guard in cycle 4 as the rate fell)
+- 60 readouts per arm: 527-777 ns +2.06 +- 0.34 spot hits/readout, z +6.1 (independent repeat of D2);
+  527-1027 +1.80 +- 0.47 (z 3.9); 27-1027 +2.71 +- 0.67 (z 4.0); 777-1027 -0.15 +- 0.31.
+- Figures: 1429_agent_confirm/figures/window_528ns.png (the 527-777 ns window), summary_vs_delay.png.
+
+### D5a (14:39-14:50) 50 ns gates 527-777 ns (--tag fine50, 20k acc, 160 readouts per arm, 0.25 s/readout)
+- 527-577 ns +0.456 +- 0.097 spot hits/readout, z +4.7; 577-627 +0.08 +- 0.06; 627-677 -0.04; 677-727 -0.03;
+  727-777 +0.04. The heralded photon arrives in 527-577 ns (fibre 110-130 m predicts ~550-640 ns incl. cables).
+- Figures: 1439_agent_fine50/figures/window_527ns.png, summary_vs_delay.png.
+
+### H (offline) Herald rate vs time (agent_scripts/herald_rate_history.py, all 735 External runs since 20 Oct)
+- 21 Oct: 55-60 kHz (09:50) -> 18 kHz (10:15) -> 45 kHz (10:40) -> 20 kHz (11:05); 70 kHz (14:00) -> 175 kHz
+  (14:20) -> 50 kHz (14:40) -> 75 kHz (14:50). 20 Oct: 44 kHz (15:30) decaying to 22 kHz by 16:30.
+- Figure: 1439_agent_herald_rate/figures/herald_rate_vs_time.png (+ .json).
