@@ -347,3 +347,40 @@ Camera free at start; -20 C Locked; no saturation; ht.shutdown after every scrip
 - 21 Oct: 55-60 kHz (09:50) -> 18 kHz (10:15) -> 45 kHz (10:40) -> 20 kHz (11:05); 70 kHz (14:00) -> 175 kHz
   (14:20) -> 50 kHz (14:40) -> 75 kHz (14:50). 20 Oct: 44 kHz (15:30) decaying to 22 kHz by 16:30.
 - Figure: 1439_agent_herald_rate/figures/herald_rate_vs_time.png (+ .json).
+
+### D5b (14:50-14:57) 10 ns gates 497-597 ns + 100 ns probes (--tag fine10, 40k acc, 40 readouts per arm)
+- All 10 ns windows flat (|z| < 2.5, no positive excess). 100 ns probe gates ending at 427-552 ns: far field 0.36-0.46e-3
+  = floor -> NOT open. Explanation found in P2/D6: 10 ns gates ending before ~577 ns do not open.
+
+### P2 (14:58) Gate-end probe (--tag gateend): delay 27 ns, widths 500..1000 ns, 10 readouts, 30k acc
+- Far field (hits/px x1e3): end 527 -> 0.55 (closed), end 552 -> 1.41 (partly), end 577 -> 2.91 (open), 602-1027 ->
+  2.9-4.0. A gate opens fully from its programmed start only if it ENDS later than ~560-577 ns after the trigger.
+  Cause unknown (camera/trigger-input behaviour with this herald signal); it hides any gate that closes earlier.
+
+### D6 (15:00-15:11) Gate-start scans with fixed gate end (--tag endfix [end 592], endfix582 [end 582]; 40k acc, 60 readouts)
+- End 592: start 447 +2.27 +- 0.47 (z 4.9), 487 +1.29 +- 0.33, 507 +2.46 +- 0.40 (z 6.2), 527 +1.64 +- 0.37,
+  547 +2.45 +- 0.31 (z 7.8), 567 -0.03 +- 0.15.
+- End 582: start 537 +2.16 +- 0.35 (z 6.3), 547 +1.97 +- 0.29 (z 6.8), 552 -0.05 +- 0.14, 557 +0.02, 562 -0.06,
+  567 0.00, 572 +0.24 +- 0.12.
+- => All heralded photons arrive between 547 and 552 ns (programmed delay) after the herald; nothing earlier (starting
+  at 447 adds nothing) and nothing later. Edge sharper than the 5 ns step: FWHM < ~5 ns.
+- Arrival-profile figure: 1512_agent_target/figures/arrival_profile.png (+ .json; agent_scripts/arrival_profile.py).
+
+### T1 (15:12-15:17) TARGET heralded single-photon image (agent_scripts/target_image.py)
+- Settings: External herald (0.5 V rising, 50 ohm), gain 9000, gate 542 ns + 40 ns, 80,000 acc/readout
+  (3.2 ms open), ON / off-delay (+5 us) blocks of 50 alternated, 4 cycles -> 200 + 200 readouts;
+  ON 0.37 s/readout (~215 k gates/s), OFF 0.77 s/readout. No saturation, -20 C Locked.
+- Result: HERALDED SINGLE PHOTONS DETECTED: +3.17 +- 0.26 net spot hits per readout, z = 12.1 over the off-delay
+  background (ON 4.18, OFF 1.01 spot hits/readout) = 4.0e-5 heralded spot hits per trigger, ~8.5 heralded photons/s
+  of wall time. Compact spot at (501, 454) in ON - OFF; nothing elsewhere.
+- threshold_sweep: significance flat ~18.7 sigma for 60-110 ADU above pedestal (best 76 ADU), falling above ~130 ADU;
+  200 ADU (used above) is conservative. plot_wiener SNR is negative because plain ADU subtraction is dominated by the
+  ungated background, which is larger in the OFF arm (0.77 vs 0.37 s per readout); use hit counting, not ADU sums.
+- Figures: 1512_agent_target/figures/heralded_single_photon_image.png (main), target_threshold_sweep.png,
+  target_plot_run.png, target_raw_vs_sum.png, target_wiener.png, target.json, arrival_profile.png.
+
+### Session 5 summary (camera 14:00-15:17, ~77 min; ht.shutdown after every script)
+- Beam back (+123,000 ADU/s, ~230 detected photons/s at the spot). Heralded photon delay 547-552 ns (programmed gate
+  delay), FWHM < ~5 ns. Target image z = 12.1 at 542 + 40 ns. Herald rate swung 50-215 k gates/s during the session.
+- Camera quirk: with the External herald, gates that end earlier than ~560-577 ns after the trigger never open.
+  The 10 ns / 25 ns fine scans were blind for that reason. Any short gate must end >= ~580 ns.
