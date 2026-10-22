@@ -56,7 +56,10 @@ test it on the camera, read the numbers and figures, change settings or code, re
   by the EM stage, present even with the intensifier off) climbs steeply.
 - Keep the sensor at -20 C Locked. Never change the temperature set point.
 - Never ask for, or assume, physical actions: no blocking beams, cables, scopes or the pump.
-  You cannot change the pump laser or the idler counter. If the remaining hypotheses all need a
+  You cannot change the pump laser or the idler counter. Exception (22 Oct): the pump power can be
+  set remotely with the XPS waveplate S.Pos2 via `hold_herald_rate.py` (see
+  `.claude/agents/herald-rate-keeper.md` and its limits); use it to hold the herald rate at
+  15-20 kHz before narrow-gate runs. If the remaining hypotheses all need a
   physical change, stop and list exactly what a person should do, and why.
 - Stay under ~2 hours of camera time per request unless told otherwise. Then report.
 
