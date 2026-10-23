@@ -474,3 +474,53 @@ readout-limited ('>='; excluded automatically). Good intervals 0.4-2.5 s, no cha
   herald_rate_readings.csv and plots rate+angle vs time, --measure, --max-rate, negative --span, --start-angle, --park,
   50 deg move cap, status check, accumulations carried between points, no sub-0.01 deg lock moves;
   waveplate_rate_check.py uses the same logging, --max-rate; herald_rate_history.py --lock-logs.
+
+## 2026-10-23 session 7 (remote; goal: re-image heralded photons at the lowest herald rate, then narrow the gate)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-23/` 1241_herald_rate_lock ... 1302_herald_rate_lock. Camera 12:41-13:03
+(~22 min), free at start, -20 C Locked, no saturation, camera closed after every script. Only S.Pos2 moved (status 12).
+
+### W1 (12:41-12:43) Re-find the pump minimum (hold_herald_rate.py --measure / --calibrate --start-angle 2.5 --span 10 --step 1.25 --park)
+- 7.546 deg: 59.4 kHz. Sweep 2.5..12.5 deg: 81.1 / 67.8 / 60.2 / 59.3 / 64.2 / 73.8 / 89.4 / 110.3 / 136.2 kHz.
+  Fit: min 59.4 kHz at 5.95 deg (moved 1.6 deg since 11:54). Parked at 5.95 deg. 1242_herald_rate_lock/figures/waveplate_calibration.png.
+
+### T3 (12:44-12:49) Target at 546+31 ns at the minimum rate (target_image.py --acc 45000 --cycles 4 --off-shift 1000, 1243_agent_target31_lowrate)
+- Hypothesis: the heralded spot is still there; per-trigger contrast improves at 1/3 of the session-6 rate.
+- External ~61 k gates/s, gain 9000, 45,000 acc (1.4 ms open), 200 ON + 200 OFF readouts, 0.73 s/readout.
+- Result: NO heralded signal: net +0.09 +- 0.09 spot hits/readout, z 1.0 (ON -0.04, OFF -0.12; session 6 expectation
+  at 1.8e-4/trigger: ~8 per readout). ON and OFF hit images identical; no spot at (501, 454).
+- Figures: 1243_agent_target31_lowrate/figures/heralded_single_photon_image.png, target_plot_run.png.
+
+### B2 (12:50-12:52) Wide-gate beam check at 59 kHz (beam_check.py, 1250_agent_beam_lowrate)
+- 29k acc x 10 us (0.29 s open), 30 readouts per arm W (27 ns + 10 us) / Woff (10027 ns + 10 us) / C (3 ns).
+- Result: SIGNAL BEAM GONE. Old spot (501, 454) core-annulus W-C -1,474 +- 1,120 ADU/s gate-open (session 5: +123,000,
+  ~230 photons/s at a similar herald rate of ~68 kHz). Only the usual stray scene (mount square, post at (350, 462), column),
+  same in W and Woff. Woff readouts 1.08 s (slightly above 1 s, see code fix below). Figure: figures/beam.png.
+
+### B3 (12:53-12:55) Beam check at higher pump (S.Pos2 14.5 deg, 175-188 kHz; 1253_agent_beam_188k)
+- Hypothesis: the ~60 kHz floor is pump-independent counts, so at the minimum there are hardly any pairs; more pump
+  should bring the beam back.
+- Result: no beam either: old spot W-C -425 +- 203 ADU/s (< ~1 photon/s). Full-frame pump-dependence image
+  (175 kHz minus 59 kHz W-C, figures/pump_dependence_W-C.png): no positive feature anywhere (max z 4.7, a single
+  point); the stray scene is ~7 % DIMMER at the higher pump, so it is not SPDC light. No pump-scaling light reaches the sensor.
+- (beam_check's own rate read 88 kHz here: readout-limited, 20k acc / 0.226 s. Fixed, see code.)
+
+### T4 (12:56-12:59) Session-6 target repeated at the session-6 rate (546+31 ns, 120k acc, 100+100 readouts, 1256_agent_target31_175k)
+- External ~167 k gates/s (session 6: 199 k), 0.72 s/readout. Net -0.11 +- 0.15 spot hits/readout, z -0.7
+  (session 6: +21.4 +- 0.65, z 33). Upper limit ~2.5e-6 heralded hits per trigger (2 sigma), ~70x below session 6.
+- => The heralded photons are gone together with the signal beam. Not a gate/delay or herald-rate effect.
+
+### Code: beam_check.py re-measures the rate with more accumulations when readout-limited (88 -> 173 kHz) and sizes
+  accumulations by the slower Woff arm (Woff 1.12 -> 0.77 s/readout at 168 kHz). Tested on the camera (1259/1300_agent_beamcheck_ratefix_test*).
+
+### Herald rate this session: 59-60 kHz at the minimum (12:42), 175-188 kHz at 14.5 deg (12:53-12:59), 70.6 kHz back at
+  5.95 deg (13:03: the floor drifts +-10 kHz). Plots: 1302_herald_rate_lock/figures/herald_rate_vs_time_lock_session7.png
+  (every reading + angle), herald_rate_vs_time_runs_session7.png (run meta).
+### Left: S.Pos2 at 5.95 deg (minimum, ~70 kHz), group S status 12. Camera closed.
+### Not done: steps 3-4 of the plan (narrower gates, contrast vs herald rate) need the signal beam; with no signal
+  photons at the camera there is nothing to compare.
+### Lab checks (physical, in this order): (1) is the signal fibre still connected and coupled? Measure signal-arm singles
+  on an APD / power meter, and signal-idler coincidences; since 21 Oct the rate at S.Pos2 28 deg rose from ~200 to 625 kHz,
+  so something on the pump/idler side changed after the laser restart, and the crystal/phase-matching or the signal-fibre
+  coupling may need re-alignment. (2) Any shutter, cap, filter or beam block in the signal path to the camera (object, lenses)?
+  (3) Did the imaging optics move (spot would land elsewhere; but no pump-dependent light was found anywhere on the full frame)?
+  (4) Is the ~60-70 kHz herald floor pump-independent (block the pump: rate should drop to dark counts)?
