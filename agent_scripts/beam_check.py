@@ -34,12 +34,28 @@ W = a.width
 arms = [("W", 27.0, W), ("Woff", 27.0 + W, W), ("C", 27.0, 3.0)]
 runs = {k: [] for k, _, _ in arms}
 info = {}
+
+
+def trigger_rate(cam):
+    """Camera-timed rate. 20k triggers take < 0.3 s above ~70 kHz, so the readout floor (0.226 s, 23 Oct)
+    sets the interval and the rate comes out as a lower bound (23 Oct: 88 kHz reported at a real 175 kHz).
+    Retry with more accumulations until a readout is clearly longer than the floor."""
+    acc = 20_000
+    for _ in range(4):
+        rate = ht.measure_trigger_rate(cam, base, accumulations=acc, n_readouts=4)
+        if rate is None or acc / rate > 0.35:
+            return rate
+        acc = int(rate * 0.6)
+    return rate
+
+
 cam, limits = ht.open_camera()
 try:
     ht.cool_down(cam, setpoint_c=-20.0, poll_s=30)
-    rate = ht.measure_trigger_rate(cam, base, accumulations=20_000, n_readouts=4)
+    rate = trigger_rate(cam)
     # a gate blocks triggers while open (dead time): gates/s ~ R / (1 + R * width); seen 14:00, 68 kHz -> 40 k gates/s at 10 us
-    eff = rate / (1 + rate * (W + 50) * 1e-9)
+    # size by the slowest arm, Woff (gate ends at 27 + 2W ns): 23 Oct at 175 kHz, sizing by W gave Woff 1.12 s/readout
+    eff = rate / (1 + rate * (27 + 2 * W + 50) * 1e-9)
     acc = int(min(a.target_s * eff, ht.MAX_GATE_OPEN_S / (W * 1e-9)) // 1000 * 1000)
     info.update(rate_hz=rate, acc=acc, start=str(datetime.datetime.now()))
     print(f"RATE {rate / 1e3:.1f} kHz -> {acc} acc", flush=True)
@@ -57,7 +73,7 @@ try:
             print(f"  {name} c{c + 1}: {dt:.2f} s/readout", flush=True)
             if dt > 1.2:
                 raise RuntimeError(f"readout interval {dt:.2f} s > 1.2 s: trigger rate dropped, stopping")
-    info["rate_end_hz"] = ht.measure_trigger_rate(cam, base, accumulations=20_000, n_readouts=4)
+    info["rate_end_hz"] = trigger_rate(cam)
 finally:
     ht.shutdown(cam)
 
