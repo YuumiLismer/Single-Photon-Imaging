@@ -438,3 +438,39 @@ Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-21/` 1717_agent_attrs .
   narrowest efficient gate: 29-31 ns ending at 577 ns.
 - A 3-10 ns gate needs the photons to arrive >= ~580 ns after the trigger: delay the signal by >= ~35 ns relative to
   the herald (shorter herald coax by ~7 m, or ~7 m more signal fibre).
+
+## 2026-10-23 herald-rate-keeper (remote; pump laser back on; goal: S.Pos2 controls herald rate, hold 15-20 kHz)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-23/` 1149_herald_rate_lock ... 1156_herald_rate_lock. Camera 11:49-12:07
+(rate readings only: gain 1, 3 ns gate, threshold 0.5 V rising; ht.shutdown after every script). Camera free at start.
+XPS: S.Pos2 28.176 deg, group S status 13 (ready) at start; S.Pos1 0 deg, untouched; group P untouched.
+Camera/XPS link via switch at 100 Mbps: readout floor still 0.226 s; only the first 20k-acc readout of each point was
+readout-limited ('>='; excluded automatically). Good intervals 0.4-2.5 s, no change of accumulations/target needed.
+
+### 11:49 Rate at the start angle, before any move (1149_herald_rate_lock, --measure): 624.9 +- 1.0 kHz at 28.176 deg.
+  2.5x the highest rate seen before (~233 kHz). Laser clearly on. Default +45 deg calibration would cross the maximum,
+  so a --max-rate ceiling (default 250 kHz) and negative --span / --start-angle were added before sweeping.
+### 11:51 +2 deg test move (1151_waveplate_rate_check, ceiling 660 kHz): 28.176 -> 624.7, 30.153 -> 681.4 kHz (ceiling
+  hit, returned). S.Pos2 moves fine; rate goes down for decreasing angle.
+### 11:52 Response check (1151_waveplate_rate_check_2): offsets 0/-5/-10/-15/-22.5/0 -> 623.3 / 467.0 / 297.5 / 150.0 /
+  59.0 / 631.0 kHz. Clear cos^2: **S.Pos2 is the pump waveplate**. Returned to 28.176.
+### 11:54 Calibration (1154_herald_rate_lock, --start-angle 15 --span -30 --step 2.5, ceiling 250 kHz, --park):
+  15.0 172 | 12.6 115 | 10.1 81.5 | 7.6 72.1 | 5.1 84.6 | 2.6 119 | 0.1 173 | -2.4 242 | -4.9 319 kHz (stopped).
+  Fit B + A cos^2(2(th - th0)): min B = 74.6 kHz at 7.55 deg (mod 90); max at 52.55 deg (mod 90); fitted max 1.48 MHz is
+  an extrapolation (only the bottom of the curve was swept), measured max so far 681 kHz at 30.15 deg.
+  **Extinction floor ~70-75 kHz, ~10 % of 680+ kHz: 15-20 kHz is out of reach with S.Pos2.** The floor also moved:
+  59 kHz at 5.7 deg at 11:53 vs 72-85 kHz at 5-7.6 deg at 11:55 (drifting pump polarization after warm-up and/or
+  a pump-independent background). Figure: 1154_herald_rate_lock/figures/waveplate_calibration.png.
+### 11:56-12:07 Hold 10 min (1156_herald_rate_lock, --hold, band 15-20 kHz): band out of reach, so the lock parked at the
+  fitted minimum 7.546 deg (no moves needed). 87 points (5 readings each): 0 % in band; 71.4 kHz mean, 67.9-76.2 kHz,
+  sd 2.2 kHz, slow +-4 kHz wander over minutes.
+### Rate-vs-time plot (every reading of the session, band shaded, angle panel):
+  1156_herald_rate_lock/figures/herald_rate_vs_time.png (also herald_rate_vs_time_lock.png via
+  `agent_scripts/herald_rate_history.py --lock-logs --since 2026-10-23T11:00`).
+### Left: S.Pos2 at 7.546 deg (~71 kHz, the minimum), group S ready (status 12, motors on). Total motion < 2 min.
+### Next: the waveplate+PBS cannot go below ~70 kHz. To reach 15-20 kHz: check the pump polarization before the HWP
+  (elliptical light or a poor PBS limits extinction), add an ND filter / lower laser current, or check for a
+  pump-independent herald background (block the pump: rate should drop to dark counts).
+### Code: trigger_rate_monitor.monitor(on_reading=, stop_after_good=); hold_herald_rate.py logs every reading/move to
+  herald_rate_readings.csv and plots rate+angle vs time, --measure, --max-rate, negative --span, --start-angle, --park,
+  50 deg move cap, status check, accumulations carried between points, no sub-0.01 deg lock moves;
+  waveplate_rate_check.py uses the same logging, --max-rate; herald_rate_history.py --lock-logs.

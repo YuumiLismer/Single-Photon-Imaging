@@ -52,7 +52,10 @@ def _configure(cam, args, accumulations, quiet=False):
     return int(cam.get_attribute_value("Accumulations"))
 
 
-def monitor(cam=None, args=None, max_readings=None, clock=time.time):
+def monitor(cam=None, args=None, max_readings=None, clock=time.time, on_reading=None, stop_after_good=None):
+    """Run the monitor. Returns the last --average good (not readout-limited) rates in Hz.
+    on_reading(dict(time, accumulations, interval_s, rate_hz, readout_limited)) is called for every
+    reading; stop_after_good=N returns as soon as N good readings in a row (same accumulations) are in."""
     a = args or parse_args([])
     opened_here = cam is None
     if cam is None:
@@ -73,13 +76,17 @@ def monitor(cam=None, args=None, max_readings=None, clock=time.time):
     readings = 0
     print(f"\nTrigger threshold {a.threshold} V, {a.edge}. Readout time {ro_s:.3f} s. Ctrl-C to stop.\n")
     print(f"{'time':>8}  {'kHz':>9}  {'avg kHz':>16}  accumulations")
+    def done():
+        return ((max_readings is not None and readings >= max_readings)
+                or (stop_after_good is not None and len(recent) >= stop_after_good))
+
     try:
-        while max_readings is None or readings < max_readings:
+        while not done():
             cam.start_acquisition()
             last = None
             changed = False
             try:
-                while not changed and (max_readings is None or readings < max_readings):
+                while not changed and not done():
                     t_wait = clock()
                     got = False
                     while clock() - t_wait < a.timeout_s:
@@ -112,6 +119,10 @@ def monitor(cam=None, args=None, max_readings=None, clock=time.time):
                                    if len(recent) > 1 else "")
                             print(f"{datetime.datetime.now():%H:%M:%S}  {'>=' if limited else '  '}"
                                   f"{rate / 1e3:7.2f}  {avg:>16}  {n_acc:,}", flush=True)
+                            if on_reading:
+                                on_reading(dict(time=datetime.datetime.now().isoformat(timespec="milliseconds"),
+                                                accumulations=n_acc, interval_s=dt, rate_hz=rate,
+                                                readout_limited=bool(limited)))
                             if writer:
                                 writer.writerow([datetime.datetime.now().isoformat(timespec="seconds"),
                                                  n_acc, f"{dt:.4f}", f"{rate:.1f}", int(limited)])

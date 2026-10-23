@@ -10,6 +10,11 @@ over-corrects for late/long gates (5-10 us: the input re-arms before the gate en
 tau <= 1.2 us (correction < ~15 %) are plotted as the herald rate; the rest are shown as gates/s. Runs whose
 interval is within 1.3x the 0.226 s readout floor are readout-limited (rate is only a lower bound)
 and are drawn hollow. Costs no camera time. Writes herald_rate_vs_time.png + .json.
+
+    python agent_scripts/herald_rate_history.py --lock-logs [--since 2026-10-23T11:00] [--out <folder>]
+        every single reading logged by hold_herald_rate.py / waveplate_rate_check.py
+        (herald_rate_readings.csv files modified since --since): rate vs time with the 15-20 kHz band
+        (--low/--high) and the pump waveplate angle in a second panel -> herald_rate_vs_time_lock.png
 """
 import argparse, sys, pathlib, json, datetime
 import numpy as np
@@ -23,7 +28,17 @@ import hoi_troubleshoot as ht
 READOUT_FLOOR_S = 0.226
 p = argparse.ArgumentParser()
 p.add_argument("--since", default="2026-10-20"); p.add_argument("--out", default=None)
+p.add_argument("--lock-logs", action="store_true", help="plot the waveplate/lock reading logs instead of saved runs")
+p.add_argument("--low", type=float, default=15e3); p.add_argument("--high", type=float, default=20e3)
 a = p.parse_args()
+if a.lock_logs:
+    import hold_herald_rate as hh
+    csvs = hh.session_csvs(datetime.datetime.fromisoformat(a.since))
+    out = pathlib.Path(a.out) if a.out else (ht.new_experiment("agent_herald_rate", quiet=True) / "figures")
+    out.mkdir(parents=True, exist_ok=True)
+    png = hh.plot_rate_history(csvs, out / "herald_rate_vs_time_lock.png", a.low, a.high)
+    print(len(csvs), "reading logs ->", png)
+    sys.exit()
 rows = []
 for f in sorted(ht.DATA_ROOT.rglob("*.npz")):
     try:
