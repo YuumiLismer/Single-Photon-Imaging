@@ -38,7 +38,9 @@ rotation stage in front of a polarizing beamsplitter, driven by a Newport XPS-D.
 
 ## How to work
 1. Read the end of `agent_log.md` and any previous `waveplate_calibration.json`.
-2. Check: camera free, `Waveplate().position()` and group status (read-only).
+2. Check: camera free, `Waveplate().position()` and group status (read-only). Then measure the
+   rate once at the current angle *before moving anything*. If there are no triggers (or only a
+   few kHz), the pump laser is probably off: stop and report, do not sweep.
 3. Quick response check: `python agent_scripts/waveplate_rate_check.py` (0, +5, +10, +15, +22.5,
    0 deg, back to start). The rate should follow cos^2 with a 45 deg max-to-min distance. If it
    is flat within noise, S.Pos2 is not the pump waveplate: return it, stop and report.
