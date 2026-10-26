@@ -257,12 +257,55 @@ def hold(cam, wp, cal, low, high, minutes, n, max_step, folder, log=None, target
     print(f"lock log: {path}")
 
 
+def track_min(cam, wp, minutes, n, dither, max_step, folder, log=None, target_s=1.0, max_rate=250e3):
+    """Follow the rate minimum while the pump polarization drifts: measure at theta - d, theta, theta + d,
+    fit a parabola and step to its vertex (capped at max_step); if the three points do not bracket a
+    minimum, step toward the lowest one. No calibration needed, so the minimum can wander freely."""
+    path = folder / "herald_rate_track.csv"
+    t_end = time.time() + 60 * minutes
+    if log:
+        log.phase = "track"
+    with open(path, "a", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["time", "angle_deg", "rate_hz", "rate_minus_hz", "rate_plus_hz", "next_angle_deg"])
+        while time.time() < t_end:
+            c = wp.position()
+            pts = {}
+            for x in (c - dither, c + dither, c):          # end on the centre: it is the logged rate
+                move(wp, x, log)
+                pts[x] = measure(cam, n, log, target_s)[0]
+            r_m, r_p, r_c = pts[c - dither], pts[c + dither], pts[c]
+            if not all(np.isfinite([r_m, r_c, r_p])):
+                print("    missing reading, retrying", flush=True)
+                continue
+            curv = r_m + r_p - 2 * r_c
+            if curv > 0:                                    # parabola opens upward: go to its vertex
+                shift = 0.5 * dither * (r_m - r_p) / curv
+            else:                                           # no bracket: walk downhill
+                shift = -dither if r_m < r_p else dither
+            nxt = c + float(np.clip(shift, -max_step, max_step))
+            if min(r_m, r_c, r_p) > max_rate:
+                print(f"    all three readings above {max_rate / 1e3:.0f} kHz: not on the minimum, "
+                      "run --calibrate first", flush=True)
+                break
+            w.writerow([datetime.datetime.now().isoformat(timespec="seconds"), f"{c:.3f}", f"{r_c:.0f}",
+                        f"{r_m:.0f}", f"{r_p:.0f}", f"{nxt:.3f}"])
+            f.flush()
+            print(f">>> {datetime.datetime.now():%H:%M:%S}  {c:8.3f} deg  {r_c / 1e3:7.1f} kHz  "
+                  f"(-{dither:g}: {r_m / 1e3:.1f}, +{dither:g}: {r_p / 1e3:.1f})  -> {nxt:.3f} deg", flush=True)
+            move(wp, nxt, log)
+    print(f"track log: {path}")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--positioner", default="S.Pos2")
     p.add_argument("--measure", action="store_true", help="only measure the rate at the current angle (no move)")
     p.add_argument("--calibrate", action="store_true")
     p.add_argument("--hold", action="store_true")
+    p.add_argument("--track-min", action="store_true",
+                   help="follow the drifting rate minimum for --minutes (dither +/- --dither deg, parabola step)")
+    p.add_argument("--dither", type=float, default=1.5, help="track-min probe offset (deg)")
     p.add_argument("--step", type=float, default=5.0, help="calibration step (deg)")
     p.add_argument("--span", type=float, default=45.0,
                    help="calibration span from the start angle (deg); negative sweeps the other way")
@@ -284,8 +327,8 @@ def main(argv=None):
     p.add_argument("--history-since", default=None,
                    help="rate-vs-time plot covers readings files modified since this ISO time (default: today 00:00)")
     a = p.parse_args(argv)
-    if not (a.measure or a.calibrate or a.hold):
-        p.error("give --measure, --calibrate and/or --hold")
+    if not (a.measure or a.calibrate or a.hold or a.track_min):
+        p.error("give --measure, --calibrate, --hold and/or --track-min")
 
     wp = xw.Waveplate(a.positioner)
     start, st = wp.position(), wp.initial_status
@@ -310,7 +353,10 @@ def main(argv=None):
             sweep_start = move(wp, a.start_angle, log)
         cal = (calibrate(cam, wp, sweep_start, a.step, a.span, a.readings, folder, log, a.target_s, a.max_rate)
                if a.calibrate else None)
-        if a.hold:
+        if a.track_min:
+            track_min(cam, wp, a.minutes, a.readings, a.dither, min(a.max_step, 3.0), folder, log,
+                      a.target_s, a.max_rate)
+        elif a.hold:
             if cal is None:
                 src = a.calibration or max(ht.DATA_ROOT.glob("*/*herald_rate_lock*/figures/waveplate_calibration.json"),
                                            key=lambda q: q.stat().st_mtime)
@@ -333,7 +379,7 @@ def main(argv=None):
             log.phase = "return"
             move(wp, start, log)
         print(f"{a.positioner} now at {wp.position():.3f} deg")
-        wp.close(disable=was_disabled and not a.hold)
+        wp.close(disable=was_disabled and not (a.hold or a.track_min))
         log.close()
         since = (datetime.datetime.fromisoformat(a.history_since) if a.history_since
                  else datetime.datetime.combine(datetime.date.today(), datetime.time()))
