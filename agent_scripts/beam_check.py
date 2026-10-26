@@ -26,8 +26,13 @@ p.add_argument("--tag", default="beam"); p.add_argument("--cycles", type=int, de
 p.add_argument("--block", type=int, default=10); p.add_argument("--width", type=float, default=10000.0)
 p.add_argument("--target-s", type=float, default=0.8, help="target wall-clock time per readout")
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454))
+p.add_argument("--analyse", default=None, help="only re-analyse this experiment folder (no camera)")
 a = p.parse_args()
-exp = ht.new_experiment(f"agent_{a.tag}"); fig_dir = exp / "figures"
+if a.analyse:
+    exp = pathlib.Path(a.analyse); ht.set_experiment(exp)
+else:
+    exp = ht.new_experiment(f"agent_{a.tag}")
+fig_dir = exp / "figures"
 base = dict(gain=9000, trigger_source="External", trigger_threshold_v=0.5, roi_center=tuple(a.spot),
             notes=f"agent {a.tag}", frame_timeout_s=30)
 W = a.width
@@ -49,37 +54,57 @@ def trigger_rate(cam):
     return rate
 
 
-cam, limits = ht.open_camera()
-try:
-    ht.cool_down(cam, setpoint_c=-20.0, poll_s=30)
-    rate = trigger_rate(cam)
-    # a gate blocks triggers while open (dead time): gates/s ~ R / (1 + R * width); seen 14:00, 68 kHz -> 40 k gates/s at 10 us
-    # size by the slowest arm, Woff (gate ends at 27 + 2W ns): 23 Oct at 175 kHz, sizing by W gave Woff 1.12 s/readout
-    eff = rate / (1 + rate * (27 + 2 * W + 50) * 1e-9)
-    acc = int(min(a.target_s * eff, ht.MAX_GATE_OPEN_S / (W * 1e-9)) // 1000 * 1000)
-    info.update(rate_hz=rate, acc=acc, start=str(datetime.datetime.now()))
-    print(f"RATE {rate / 1e3:.1f} kHz -> {acc} acc", flush=True)
-    for c in range(a.cycles):
-        order = arms[c % 3:] + arms[:c % 3]
-        for name, d, w in order:
-            r = ht.take_run(cam, **{**base, "label": f"{a.tag}_{name}_c{c + 1}", "gate_delay_ns": d,
-                                    "gate_width_ns": w, "accumulations": acc, "n_readouts": a.block})
-            if r is None:
-                raise RuntimeError("no readouts (triggers stopped?)")
-            if float((r["first"] >= ht.SATURATION_ADU).mean()) > 1e-3:
-                raise RuntimeError("saturation > 0.1%: stopping")
-            runs[name].append(r)
-            dt = ht.readout_interval_s(r)
-            print(f"  {name} c{c + 1}: {dt:.2f} s/readout", flush=True)
-            if dt > 1.2:
-                raise RuntimeError(f"readout interval {dt:.2f} s > 1.2 s: trigger rate dropped, stopping")
-    info["rate_end_hz"] = trigger_rate(cam)
-finally:
-    ht.shutdown(cam)
+def run_camera():
+    cam, limits = ht.open_camera()
+    try:
+        ht.cool_down(cam, setpoint_c=-20.0, poll_s=30)
+        rate = trigger_rate(cam)
+        # a gate blocks triggers while open (dead time): gates/s ~ R / (1 + R * width); seen 14:00, 68 kHz -> 40 k gates/s at 10 us
+        # size by the slowest arm, Woff (gate ends at 27 + 2W ns): 23 Oct at 175 kHz, sizing by W gave Woff 1.12 s/readout
+        eff = rate / (1 + rate * (27 + 2 * W + 50) * 1e-9)
+        acc = int(min(a.target_s * eff, ht.MAX_GATE_OPEN_S / (W * 1e-9)) // 1000 * 1000)
+        info.update(rate_hz=rate, acc=acc, start=str(datetime.datetime.now()))
+        print(f"RATE {rate / 1e3:.1f} kHz -> {acc} acc", flush=True)
+        for c in range(a.cycles):
+            order = arms[c % 3:] + arms[:c % 3]
+            for name, d, w in order:
+                r = ht.take_run(cam, **{**base, "label": f"{a.tag}_{name}_c{c + 1}", "gate_delay_ns": d,
+                                        "gate_width_ns": w, "accumulations": acc, "n_readouts": a.block})
+                if r is None:
+                    raise RuntimeError("no readouts (triggers stopped?)")
+                if float((r["first"] >= ht.SATURATION_ADU).mean()) > 1e-3:
+                    raise RuntimeError("saturation > 0.1%: stopping")
+                runs[name].append(r)
+                dt = ht.readout_interval_s(r)
+                print(f"  {name} c{c + 1}: {dt:.2f} s/readout", flush=True)
+                if dt > 1.2:
+                    raise RuntimeError(f"readout interval {dt:.2f} s > 1.2 s: trigger rate dropped, stopping")
+        info["rate_end_hz"] = trigger_rate(cam)
+    finally:
+        ht.shutdown(cam)
+
+
+if a.analyse:
+    for r in ht.load_runs(exp / "runs"):
+        lab = r["meta"].get("label", pathlib.Path(r["meta"]["file"]).stem)
+        for name in runs:
+            if f"_{name}_c" in lab:
+                runs[name].append(r)
+    j = json.loads((fig_dir / "beam.json").read_text()) if (fig_dir / "beam.json").exists() else {}
+    info.update({k: j[k] for k in ("rate_hz", "acc", "start", "rate_end_hz") if k in j})
+    if "acc" not in info:
+        info["acc"] = int(runs["W"][0]["meta"]["actual"]["accumulations"])
+        info.setdefault("rate_hz", float("nan")); info.setdefault("start", runs["W"][0]["meta"].get("time", "?"))
+else:
+    run_camera()
 
 
 def mean_frame(rs):
-    return sum(r["sum"].astype(float) for r in rs) / sum(ht.n_rd(r) for r in rs)
+    """Mean frame per readout. With >= 3 runs: per-pixel MEDIAN of the per-run means, so a single
+    readout transient cannot fake a spot (26 Oct 09:27: one event of 54,000 ADU at (907, 781) in one of
+    three W runs came out as a 'beam' with DoG z 99 in the plain mean)."""
+    per = [r["sum"].astype(float) / ht.n_rd(r) for r in rs]
+    return np.median(per, axis=0) if len(per) >= 3 else sum(per) / len(per)
 
 
 def cma(img, cx, cy):
@@ -87,6 +112,7 @@ def cma(img, cx, cy):
     return float((img[rr < 6] - img[(rr >= 10) & (rr <= 16)].mean()).sum())
 
 
+SFX = "_robust" if a.analyse else ""
 open_s = W * 1e-9 * info["acc"]
 F = {k: mean_frame(v) for k, v in runs.items() if v}
 res = dict(info, open_s=open_s, n_readouts={k: sum(ht.n_rd(r) for r in v) for k, v in runs.items()},
@@ -114,7 +140,7 @@ for diff, (A_, B_) in {"W-C": ("W", "C"), "Woff-C": ("Woff", "C"), "W-Woff": ("W
                      top_photons_s=top[0] / ADU_PER_PHOTON, old_photons_s=old[0] / ADU_PER_PHOTON,
                      median_adu_px_s=float(np.median(net)))
 res["diffs"] = out
-(fig_dir / "beam.json").write_text(json.dumps(ht._jsonable(res), indent=1))
+(fig_dir / f"beam{SFX}.json").write_text(json.dumps(ht._jsonable(res), indent=1))
 print(json.dumps(ht._jsonable(res), indent=1))
 
 fig, ax = plt.subplots(2, 3, figsize=(17, 10.5))
@@ -137,8 +163,8 @@ for j, diff in enumerate(["W-C", "Woff-C", "W-Woff"]):
     v = np.percentile(z, [1, 99.9])
     h = ax[1, j].imshow(z, cmap="magma", vmin=v[0], vmax=v[1], extent=(max(0, cx - 75), cx + 75, cy + 75, max(0, cy - 75)))
     fig.colorbar(h, ax=ax[1, j]); ax[1, j].set_title(f"{diff}: 150x150 around ({cx},{cy})", fontsize=9)
-fig.suptitle(f"Beam check {res['start'][:16]}: External trigger {info['rate_hz'] / 1e3:.1f} kHz "
+fig.suptitle(f"Beam check{' (median of runs)' if len(runs['W']) >= 3 else ''} {res['start'][:16]}: External trigger {info['rate_hz'] / 1e3:.1f} kHz "
              f"(end {info.get('rate_end_hz', float('nan')) / 1e3:.1f}), gain 9000, {info['acc']:,} acc x 10 us = "
              f"{open_s:.2f} s open/readout; W = 27 ns+10 us, Woff = {27 + W:g} ns+10 us, C = 3 ns gate", fontsize=10)
-fig.tight_layout(); fig.savefig(fig_dir / "beam.png", dpi=110)
+fig.tight_layout(); fig.savefig(fig_dir / f"beam{SFX}.png", dpi=110)
 print("EXP", exp)
