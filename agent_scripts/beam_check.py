@@ -86,7 +86,7 @@ def run_camera():
 
 if a.analyse:
     for r in ht.load_runs(exp / "runs"):
-        lab = r["meta"].get("label", pathlib.Path(r["meta"]["file"]).stem)
+        lab = pathlib.Path(r["meta"]["file"]).stem
         for name in runs:
             if f"_{name}_c" in lab:
                 runs[name].append(r)
