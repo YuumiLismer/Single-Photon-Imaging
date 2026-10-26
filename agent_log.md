@@ -524,3 +524,66 @@ Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-23/` 1241_herald_rate_l
   coupling may need re-alignment. (2) Any shutter, cap, filter or beam block in the signal path to the camera (object, lenses)?
   (3) Did the imaging optics move (spot would land elsewhere; but no pump-dependent light was found anywhere on the full frame)?
   (4) Is the ~60-70 kHz herald floor pump-independent (block the pump: rate should drop to dark counts)?
+
+## 2026-10-26 session 8 (remote; Tristan: "run everything at the lowest possible kHz ... find the herald photons"; goal: image them)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-26/` 0921_herald_rate_lock ... 0947_herald_rate_lock. Camera 09:21-09:48
+(~27 min), free at start, -20 C Locked, no saturation, camera closed after every script. Only S.Pos2 moved (status 12 throughout).
+
+### R1 (09:21) Rate at the start angle, before moving: 303.5 +- 0.7 kHz at 16.787 deg (23 Oct: ~100 kHz at this angle).
+### R2 (09:22-09:24) Fine sweep 13 -> -3 deg, 1 deg steps (0922_herald_rate_lock): 168.7 / 137.6 / 108.7 / 82.8 / 60.6 / 42.2 / 28.0 /
+  19.3 / **15.3 (5.06 deg)** / 15.6 (4.04) / 20.8 / 30.9 / 46.5 / 65.4 / 87.2 / 112 / 141 kHz. Fit: min 16.0 kHz at 4.65 deg, max ~1.87 MHz.
+  NEW: extinction is now ~0.8 % (floor 15-30 kHz) vs ~5-10 % on 23 Oct (floor 59-75 kHz): 15-20 kHz IS reachable now. The pump
+  side changed since 23 Oct (rate at a given angle ~3x higher, much better extinction). Figure: 0922_herald_rate_lock/figures/waveplate_calibration.png.
+### R3 Floor vs time at the minimum (angle stable at 4.55-4.65 deg): 15.3 kHz (09:23), 24.8 / 27.4 (09:25), 22.6 (sweep 09:26-09:27,
+  0926_herald_rate_lock), 29-30 (09:38, threshold scan), 21-25 k gates/s (target, 09:39-09:45), 17.3 (sweep 09:46), 18.8 kHz (09:47).
+  The floor wanders 15-30 kHz on minute scales; the minimum angle does not move. Re-parking at the minimum was enough.
+  Plots: 0947_herald_rate_lock/figures/herald_rate_vs_time_lock_session8.png/herald_rate_vs_time_lock.png (waveplate/lock readings + angle),
+  herald_rate_vs_time_runs_session8.png/herald_rate_vs_time.png (every External run of the session incl. 76/178 kHz beam checks).
+
+### B1 (09:27) Wide-gate beam check at the minimum, ~25 kHz (beam_check.py, 0927_agent_agent_beam_min)
+- Hypothesis: after 3 days the signal beam may be back (Tristan may have worked on the setup).
+- Settings: gain 9000, External 0.5 V rising, 13,000 acc; W = 27 ns + 10 us, Woff = 10027 ns + 10 us, C = 3 ns; 3 cycles x 10 readouts (0.69-0.90 s/readout).
+- First result looked like a NEW compact spot at (907, 781), W-C DoG z 99, W-Woff z 82 (+61,600 +- 61,400 ADU/s). The error bar = the
+  value: it was a single transient (232k ADU core, max pixel 54,000 ADU) in ONE of the three W runs (W_c3); the other 8 runs show
+  0.2-8k. Not light. Fixed beam_check: per-pixel median of the per-run frames (commit 80ae50b), re-analysed: beam_robust.png.
+- Robust result: no spot. Old spot (501, 454): W-C -427 +- 2,190, W-Woff -129 +- 1,349 ADU/s gate-open (session 5: +123,000 at 66 kHz).
+  W-C shows only the usual stray scene (mount square, post at (355, 460-507), static point (232, 159)), identical in Woff.
+- Heralded reading of the same data (W-Woff covers heralded arrivals 27 ns - 10 us, full frame, gates that certainly open):
+  old spot -0.03 +- 0.33 photons/readout vs ~2.3 expected at session-6 efficiency (1.8e-4/trigger x 13k gates): ~7 sigma below.
+- Figures: 0927_agent_agent_beam_min/figures/beam.png (plain mean, with the transient), beam_robust.png.
+
+### B2 (09:31-09:35) Pump dependence: same beam check at S.Pos2 9.46 deg (75.7 kHz, 24k acc) and 13.47 deg (177.9 kHz, 31k acc)
+- 0931_agent_beam_70k, 0933_agent_beam_190k; analysis agent_scripts/pump_dependence.py (new, commit 40a05cb).
+- Result: NO pump-dependent light anywhere on the full frame. Old spot (high-low) W-C -52 / -222 ADU/s, W-Woff -581 / +2,201 ADU/s;
+  top DoG candidates z 5-7.5 all on the stray-lit post edge (negative/positive residuals of the scene). The stray scene gets
+  DIMMER with pump: bright-pixel ratio 0.957 (76 vs 25 kHz) and 0.892 (178 vs 25 kHz), where SPDC light would be 3.0x / 7.2x (same
+  as session 7: -7 %). At 178 kHz heralded W-Woff at the old spot: +1.3 +- 0.7 photons/readout vs ~5.6 expected.
+- Expectation if the source were as on 21 Oct: ~123,000 ADU/s at 66 kHz -> ~300,000 ADU/s (~600 photons/s) at 178 kHz; measured
+  < ~2,500 (2 sigma): > 100x below. Figure: 0933_agent_beam_190k/figures/pump_dependence.png (+ .json).
+
+### C1 (09:37) Herald trigger health (threshold_rate.py, 0937_agent_thr_rate; at the minimum, gain 9000 x 3 ns gate)
+- Rising 0.2/0.3/0.5/0.8/1.0/1.3 V: 30.3/29.8/29.4/29.7/29.6/29.8 kHz; falling: 29.8/29.7/29.9/29.4/29.3/28.7 kHz.
+  Flat plateau on both edges: clean pulses > 1.3 V, no noise counting or double counting at 0.5 V.
+
+### T1 (09:39-09:45) Heralded target at the minimum rate, 546 + 31 ns (target_image.py --acc 20000 --off-shift 1000, 0939_agent_target31_min)
+- Hypothesis (Tristan's question): at ~20 kHz the per-trigger contrast should be at least as good as session 6 (z 33 at ~199 kHz).
+- Settings: gain 9000, External ~21-25 k gates/s, 20,000 acc (0.62 ms open), OFF 1546+31 ns, blocks of 50, 200 ON + 200 OFF
+  readouts, 0.80 (ON up to 0.94) s/readout.
+- Result: net +0.06 +- 0.10 spot hits/readout, z 0.6 (ON -0.14, OFF -0.20; expected ~3.6 at 1.8e-4/trigger). ON and OFF hit
+  images identical (same hot pixels). 2-sigma upper limit 1.4e-5 heralded spot hits per trigger, 13x below session 6.
+- Figures: 0939_agent_target31_min/figures/heralded_single_photon_image.png, target_wiener.png, target_plot_run.png, target_threshold_sweep.png.
+
+### C2 (offline) Camera sensitivity unchanged: stray-scene median W-C 150-250 ADU/px/s and the static point (232, 159) 12-22k ADU/s
+  in session 5 (beam present), session 7 and today alike. The intensifier, External gating and readout work as when the photons
+  were imaged; the missing light is upstream of the camera.
+
+### Conclusion: the signal light (heralded or not) still does not reach the camera, at 25, 76 or 178 kHz, at any position on the
+  sensor or any arrival time 27 ns - 10 us. Heralded imaging cannot proceed remotely; no narrower-gate / contrast-vs-rate
+  comparison was possible. Stopped after ~27 min of camera time, as planned for this outcome.
+### Left: S.Pos2 at 4.545 deg (minimum; 18.8 kHz at 09:47), group S status 12. Camera closed (checked free at 09:48).
+### Lab checks (physical): (1) signal arm: is the signal fibre connected at both ends and coupled? Measure signal singles on an APD
+  and signal-idler coincidences on the time tagger (expected delay ~550 ns herald-to-gate). (2) The herald side clearly changed
+  since 21-23 Oct (rate at a fixed angle 200 -> 625 -> ~1000 kHz at 28 deg; extinction 10 % -> 0.8 %): what was changed (laser
+  power, idler coupling/detector, PBS/HWP)? Check the idler counts are SPDC (coincidences with signal), not pump leakage or
+  fluorescence. (3) Any cap/shutter/filter/block between the signal fibre output and the camera; did the imaging optics move.
+  (4) Once the signal beam is visible again (beam_check.py: compact spot in W-C), re-run target_image.py at 546+31 ns at the minimum.
