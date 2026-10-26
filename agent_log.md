@@ -587,3 +587,54 @@ Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-26/` 0921_herald_rate_l
   power, idler coupling/detector, PBS/HWP)? Check the idler counts are SPDC (coincidences with signal), not pump leakage or
   fluorescence. (3) Any cap/shutter/filter/block between the signal fibre output and the camera; did the imaging optics move.
   (4) Once the signal beam is visible again (beam_check.py: compact spot in W-C), re-run target_image.py at 546+31 ns at the minimum.
+
+## 2026-10-26 session 9 (remote; after Tristan's APD check + signal-coupler touch-up + camera power cycle; goal: heralded image at the narrowest gate)
+Data: `Desktop/HOI_freshstaret/data/troubleshoot/2026-10-26/` 1440_herald_rate_lock ... 1448_herald_rate_lock. Camera 14:42-14:49
+(~7 min), free at start (now 192.168.0.81), -20 C Locked, no saturation, camera closed after every script. Only S.Pos2 moved (status 12).
+Context (Tristan, APDs at the crystal-side couplers, max pump): 2 M idlers/s, 4 M signals/s, 200 k coincidences/s, accidentals ~8 k/s.
+
+### W1 (14:42-14:43) Waveplate: found at 144.0 deg (moved by someone). Rate there 799.9 kHz (camera, gain 1, 3 ns gate; near the max).
+- Moved to 102 deg (42 deg) and swept 1-deg steps down (1440_herald_rate_lock, ceiling 250 kHz): 102 103.4 | 101 93.2 | 100 86.6 |
+  99 83.0 | 98 83.0 | 97 86.4 | 96 93.9 | 95 105.7 | 94 121.8 | 93 145 | 92 174 | 91 204 | 90 237 | 89 270 kHz (stopped).
+- Fit: min 80.4 kHz at 8.60 deg (mod 90), max (extrapolated) 1.87 MHz at 53.6 deg. Parked at 98.596 deg.
+- NEW: the minimum moved by +4 deg (4.6 -> 8.6 mod 90) and the floor rose from 15-30 kHz (session 8, this morning) to ~80 kHz.
+  **The 15-20 kHz band is out of reach again**; the minimum itself is 4x above the 20 kHz trigger-error limit. Extinction ~4 %
+  (80 / ~2000 kHz) vs 0.8 % this morning: the pump polarization into the HWP/PBS (or a pump-independent idler background) changed
+  with today's lab work. Needs an ND filter / lower laser current, or a check of the polarization before the HWP.
+- Figure: 1440_herald_rate_lock/figures/waveplate_calibration.png.
+
+### B1 (14:43-14:45) Wide-gate beam check at the minimum (beam_check.py, 1443_agent_beam_min83k)
+- Hypothesis: after the coupler realignment the signal beam reaches the camera again (APDs show 4 M signals/s at max pump).
+- Settings: gain 9000, External 0.5 V rising, 24,000 acc; W = 27 ns + 10 us, Woff = 10027 ns + 10 us, C = 3 ns; 3 cycles x 10 readouts
+  (0.57 / 0.83 / 0.30 s per readout). Herald 80.4 kHz at start, 55.9 kHz at end.
+- Result: NO signal beam. Old spot (501, 454) core-annulus: W-C -139 +- 1,643, W-Woff +745 +- 1,838 ADU/s gate-open (~1.4 +- 3.5
+  photons/s; 21 Oct at 66 kHz: +123,000). Full frame W-C: only the known stray scene (mount square, post (355, 454-504), static
+  point (232, 159), present in Woff too and in sessions 7-8); W-Woff: noise, top DoG candidates z ~5 on the post edge.
+  Stray-scene median W-C 176 ADU/px/s (this morning 182, 21 Oct 250): camera and imaging side unchanged.
+- Heralded reading (W-Woff, 27 ns - 10 us): expected at session-6 efficiency 1.8e-4/trigger -> ~4.3 photons/readout = ~9,600 ADU/s;
+  measured +745 +- 1,838 (~5 sigma below).
+- Figure: 1443_agent_beam_min83k/figures/beam.png (+ beam.json).
+
+### T1 (14:46-14:48) Heralded target at 546 + 31 ns (target_image.py --acc 45000 --cycles 2 --off-shift 1000, 1446_agent_target31_min83k)
+- Rate right before / after: 76.1 / 80.3 kHz (98.596 deg). Run: ~78 k gates/s, 0.57 s/readout, 100 ON + 100 OFF readouts.
+- Result: net +0.03 +- 0.13 spot hits/readout, z 0.3 (ON -0.04, OFF -0.07; expected ~8 at session-6 efficiency). ON and OFF
+  hit images identical (same hot pixels). 2-sigma upper limit 6.4e-6 heralded spot hits per trigger (28x below session 6).
+- Figures: 1446_agent_target31_min83k/figures/heralded_single_photon_image.png, target_wiener.png, target_plot_run.png, target_threshold_sweep.png.
+
+### Herald rate this session: 800 kHz at 144 deg (found), 76-83 kHz at the minimum 98.6 deg, dipping to ~56 kHz for ~1 min (14:45).
+  Imaging time above 20 kHz: 100 % (all ~7 min). Plots: 1440_herald_rate_lock/figures/herald_rate_vs_time_lock_session9.png/
+  herald_rate_vs_time_lock.png (waveplate readings + angle), herald_rate_vs_time_runs_session9.png/herald_rate_vs_time.png (camera runs).
+
+### Conclusion: after the realignment the signal light (heralded or not) still does not reach the camera: no spot anywhere on the full
+  frame at 27 ns - 10 us, no heralded excess at 546+31 ns. Since the APDs see 4 M signals/s at the crystal-side coupler, the loss is
+  between that coupler and the camera. No delay scan / narrow-gate series possible (nothing to narrow on). Stopped early as planned.
+### Left: S.Pos2 at 98.596 deg (minimum, ~80 kHz), group S status 12. Camera closed (checked free 14:50).
+### Lab checks (physical, in order):
+  (1) Signal path after the APD test: is the signal fibre reconnected from the crystal-side coupler to the ~100 m delay fibre and from
+      the delay fibre to the imaging mount (the APD test needed it unplugged)? Check each connector (FC/PC vs FC/APC mismatch, dust),
+      and measure power/counts at the fibre end that goes into the imaging mount (e.g. APD on the delay-fibre output: expect ~MHz
+      signals at max pump). That locates the loss to one segment.
+  (2) At the imaging mount: fibre seated in the mount, caps off, filters/lens in place; any shutter/block between it and the camera.
+  (3) Herald rate: the minimum is ~80 kHz now (15-30 kHz this morning), so the pump extinction got worse: check the pump
+      polarization before the HWP, or add an ND filter / lower the laser current to reach 15-20 kHz at the minimum.
+  (4) Then re-run beam_check.py (compact spot in W-C), then target_image.py at 546+31 ns and the narrow-gate series.
