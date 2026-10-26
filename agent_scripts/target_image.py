@@ -36,8 +36,28 @@ p.add_argument("--off-shift", type=float, default=5000.0, help="OFF gate = ON ga
 p.add_argument("--rate-band", type=float, default=None,
                help="readout post-selection: keep readouts whose interval is within this fraction of the arm's median "
                     "(drops readouts taken while the herald rate spiked/dropped); figures get suffix _band<x>")
+p.add_argument("--spot", type=int, nargs=2, default=(501, 454),
+               help="signal spot (x y) on the sensor: beam-template centre and ROI centre (26 Oct 15:30: moved to 462 460)")
+p.add_argument("--template-exp", default=None,
+               help="beam_check experiment folder whose W-C image (median of runs) gives the beam-profile matched filter "
+                    "for --spot (default: the 20 Oct 12:21 template, valid only for the old ROI at (501, 454))")
 a = p.parse_args()
-SPOT = (501, 454)
+SPOT = tuple(a.spot)
+
+
+def beam_template_from_beamcheck(folder, roi, spot, rmax=15):
+    """Matched-filter weights from a beam_check experiment: per-pixel median over runs of W minus C (mean frame
+    per readout), cropped to the target ROI, positive part within rmax of the spot, peak-normalised."""
+    rs = ht.load_runs(str(folder))
+    arm = lambda r, k: f"_{k}_c" in r["meta"]["settings"]["label"]
+    fr = lambda k: np.median([r["sum"].astype(float) / ht.n_rd(r) for r in rs if arm(r, k)], axis=0)
+    d = fr("W") - fr("C")
+    x0, y0, n = roi
+    d = d[y0:y0 + n, x0:x0 + n]
+    d = d - np.median(d)
+    yy, xx = np.indices((n, n)); rr = np.hypot(xx - (spot[0] - x0), yy - (spot[1] - y0))
+    w = np.clip(gaussian_filter(d, 1.0), 0, None) * (rr <= rmax)
+    return w / w.max(), rr
 
 
 def merge(rs):
@@ -57,7 +77,7 @@ if a.analyse:
     offs = [r for r in rs if r["meta"]["settings"]["kind"] == "dark_offdelay"]
 else:
     exp = ht.new_experiment(f"agent_{a.tag}")
-    base = dict(gain=9000, trigger_source="External", trigger_threshold_v=0.5, roi_center=(500, 455), kind="signal",
+    base = dict(gain=9000, trigger_source="External", trigger_threshold_v=0.5, roi_center=SPOT, kind="signal",
                 gate_delay_ns=a.delay, gate_width_ns=a.width, accumulations=a.acc, n_readouts=a.block,
                 notes="agent session 5 target: heralded single-photon image")
     ons, offs = [], []
@@ -84,7 +104,8 @@ else:
         ht.shutdown(cam)
 
 S, D = merge(ons), merge(offs)
-w, rr = beam_template(S["meta"]["roi"], SPOT)
+w, rr = (beam_template_from_beamcheck(a.template_exp, S["meta"]["roi"], SPOT) if a.template_exp
+         else beam_template(S["meta"]["roi"], SPOT))
 eff = (w * w / w.sum()).sum()
 ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]
 
@@ -148,12 +169,13 @@ except Exception as e:
     print(f"  threshold_sweep failed: {type(e).__name__}: {e}")
 (fig_dir / f"target{sfx}.json").write_text(json.dumps(ht._jsonable(res), indent=1))
 
+off_delay = float(D["meta"]["actual"]["gate_delay_ns"])     # from the OFF runs (not --off-shift: wrong in --analyse)
 x0, y0, n = S["meta"]["roi"]
 ext = (x0 - .5, x0 + n - .5, y0 + n - .5, y0 - .5)
 fig, ax = plt.subplots(1, 3, figsize=(16.5, 5.4))
 vmax = np.percentile(gaussian_filter(Hon, 1), 99.7)
 panels = ((ax[0], Hon, f"ON gate {delay:g}-{delay + width:g} ns after the herald"),
-          (ax[1], Hoff, f"OFF gate {delay + a.off_shift:g}-{delay + a.off_shift + width:g} ns (off-delay background)"))
+          (ax[1], Hoff, f"OFF gate {off_delay:g}-{off_delay + width:g} ns (off-delay background)"))
 for a_, im, t in panels:
     h = a_.imshow(gaussian_filter(im, 1), cmap="inferno", vmin=0, vmax=vmax, extent=ext)
     a_.set_title(t + "\nphoton hits per pixel per readout (1 px smooth)", fontsize=10)
