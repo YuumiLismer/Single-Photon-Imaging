@@ -45,20 +45,6 @@ a = p.parse_args()
 SPOT = tuple(a.spot)
 
 
-def beam_template_from_beamcheck(folder, roi, spot, rmax=15):
-    """Matched-filter weights from a beam_check experiment: per-pixel median over runs of W minus C (mean frame
-    per readout), cropped to the target ROI, positive part within rmax of the spot, peak-normalised."""
-    rs = ht.load_runs(str(folder))
-    arm = lambda r, k: f"_{k}_c" in r["meta"]["settings"]["label"]
-    fr = lambda k: np.median([r["sum"].astype(float) / ht.n_rd(r) for r in rs if arm(r, k)], axis=0)
-    d = fr("W") - fr("C")
-    x0, y0, n = roi
-    d = d[y0:y0 + n, x0:x0 + n]
-    d = d - np.median(d)
-    yy, xx = np.indices((n, n)); rr = np.hypot(xx - (spot[0] - x0), yy - (spot[1] - y0))
-    w = np.clip(gaussian_filter(d, 1.0), 0, None) * (rr <= rmax)
-    return w / w.max(), rr
-
 
 def merge(rs):
     m = dict(rs[0]); m["meta"] = json.loads(json.dumps(rs[0]["meta"]))
@@ -104,8 +90,7 @@ else:
         ht.shutdown(cam)
 
 S, D = merge(ons), merge(offs)
-w, rr = (beam_template_from_beamcheck(a.template_exp, S["meta"]["roi"], SPOT) if a.template_exp
-         else beam_template(S["meta"]["roi"], SPOT))
+w, rr = beam_template(S["meta"]["roi"], SPOT, template_exp=a.template_exp)
 eff = (w * w / w.sum()).sum()
 ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]
 

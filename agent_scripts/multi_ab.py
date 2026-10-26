@@ -61,7 +61,7 @@ for s in a.arm:
 spot = tuple(a.spot)
 exp = ht.new_experiment(f"agent_{a.tag}"); folder = exp / "figures"
 base = dict(gain=a.gain, accumulations=a.acc, trigger_source="External", trigger_threshold_v=0.5,
-            roi_center=(500, 455), notes=f"agent {a.tag}")
+            roi_center=spot, notes=f"agent {a.tag}")
 rec = []; imgs = {m["name"]: [0, 0] for m in arms}
 
 

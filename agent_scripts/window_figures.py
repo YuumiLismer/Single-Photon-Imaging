@@ -24,6 +24,7 @@ from analyze_ab import beam_template, arm_of
 p = argparse.ArgumentParser()
 p.add_argument("folder"); p.add_argument("--thr", type=float, default=200)
 p.add_argument("--spot", type=int, nargs=2, default=(501, 454))
+p.add_argument("--template-exp", default=None, help="beam_check folder for the beam-profile matched filter (needed when --spot moved)")
 p.add_argument("--max-dt", type=float, default=None, help="drop runs with readout interval above this (s)")
 p.add_argument("--suffix", default="", help="appended to figure/json names")
 p.add_argument("--method", choices=("control", "regress"), default="control",
@@ -51,7 +52,7 @@ if a.max_dt:
     runs = [r for r in runs if ht.readout_interval_s(r) <= a.max_dt]
     print(len(runs), "runs kept with readout interval <=", a.max_dt, "s")
 roi = runs[0]["meta"]["roi"]; x0, y0, n = roi
-w, rr = beam_template(roi, tuple(a.spot)); prof = w / w.sum(); eff_mf = (w * prof).sum()
+w, rr = beam_template(roi, tuple(a.spot), template_exp=a.template_exp); prof = w / w.sum(); eff_mf = (w * prof).sum()
 ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]
 def readout_dts(r):
     t = np.asarray(r["t"], float); dt = np.diff(t)
@@ -140,7 +141,7 @@ for d, on in wins:
     fig.suptitle(f"Gate {rec['delay']:g} ns, width {width:g} ns, gain {gain}, {acc:,} accumulations/readout, "
                  f"{nro} ON + {rec['readouts_off']} OFF readouts, External trigger\n"
                  f"net spot hits/readout {net:+.2f} +- {err:.2f}  ->  z = {net / err:+.1f}   "
-                 f"(cyan circle = spot (501, 454), r = 10 px; >= 4 = candidate, >= 5 = detection)")
+                 f"(cyan circle = spot {tuple(a.spot)}, r = 10 px; >= 4 = candidate, >= 5 = detection)")
     fig.tight_layout(); fig.savefig(figs / f"window_{tag}{a.suffix}.png", dpi=100); plt.close(fig)
     print(f"{on:>7s} {R[0]['delay']:g}+{width:g} ns: net {net:+.3f} +- {err:.3f} spot hits/readout, z {net / err:+.2f} | r<=10 {res['h10'][0]:+.3f} +- {res['h10'][1]:.3f}"
           f" | {nro} readouts, {rec['s_per_readout_on']:.2f} s/readout | 2-sigma limit {rec['limit_2sigma_per_trigger']:.1e}/trigger")

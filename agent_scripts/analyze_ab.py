@@ -26,7 +26,21 @@ TEMPLATE_RUNS = ("2026-10-20/1221_notebook_session/runs/20261020T122130_A_wide_g
                  "2026-10-20/1221_notebook_session/runs/20261020T122510_A_wide_gate_blocked_dark.npz")
 
 
-def beam_template(roi, spot=(501, 454), rmax=15):
+def beam_template(roi, spot=(501, 454), rmax=15, template_exp=None):
+    """Beam-profile matched filter (peak-normalised, r <= rmax around spot) in the ROI. Default: the 20 Oct 12:21
+    high-pump image (only valid for the old ROI/spot). template_exp = a beam_check experiment folder: its W-C image
+    (per-pixel median over runs of the mean frame per readout) is used instead (26 Oct: the spot moved to (462, 460))."""
+    if template_exp is not None:
+        from scipy.ndimage import gaussian_filter
+        rs = ht.load_runs(str(template_exp))
+        fr = lambda k: np.median([r["sum"].astype(float) / ht.n_rd(r) for r in rs
+                                  if f"_{k}_c" in r["meta"]["settings"]["label"]], axis=0)
+        x0, y0, n = roi
+        d = (fr("W") - fr("C"))[y0:y0 + n, x0:x0 + n]
+        d = gaussian_filter(d - np.median(d), 1.0)
+        yy, xx = np.indices((n, n)); rr = np.hypot(xx - (spot[0] - x0), yy - (spot[1] - y0))
+        w = np.clip(d, 0, None) * (rr <= rmax)
+        return w / w.max(), rr
     s, b = (ht.load_run(ht.DATA_ROOT / p) for p in TEMPLATE_RUNS)
     assert s["meta"]["roi"] == list(roi), "template ROI differs"
     d = s["roi_stack"].astype(float).mean(0) - b["roi_stack"].astype(float).mean(0)
