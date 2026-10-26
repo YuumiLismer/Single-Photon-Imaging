@@ -638,3 +638,43 @@ Context (Tristan, APDs at the crystal-side couplers, max pump): 2 M idlers/s, 4 
   (3) Herald rate: the minimum is ~80 kHz now (15-30 kHz this morning), so the pump extinction got worse: check the pump
       polarization before the HWP, or add an ND filter / lower the laser current to reach 15-20 kHz at the minimum.
   (4) Then re-run beam_check.py (compact spot in W-C), then target_image.py at 546+31 ns and the narrow-gate series.
+
+## 2026-10-26 session 10 (remote; after Tristan re-centred the beam; goal: heralded image at the narrowest gate)
+### Agent runs (15:25-16:05; logged afterwards from the run folders, the session ended before the agent wrote its log)
+- 1525_agent_beam_centered_min: beam template. Signal spot moved to (462, 460) (target_image/multi_ab/window_figures --spot 462 460).
+- T1 (1533_agent_target31_newspot) 546 + 31 ns, 40,000 acc, 100 ON + 100 OFF (OFF +1 us), ~71 k gates/s: net +3.65 +- 0.33
+  spot hits/readout, **z 10.9**, 9.1e-5 per trigger (about half of session 6). Heralded photons are back.
+- W1 (1558_agent_width_newspot, OFF 1546+31): 545+31 +3.17 (z 7.1), 540+20 +2.41 (6.7), 546+18 +2.52 (6.5), 548+12 +2.48 (6.3),
+  535+25 +2.12 (5.1), 547+15 +2.28 (4.9). Gates ending at 560 ns fire today (session 6: ending < ~567 mostly closed).
+
+### N1 (16:09, 1609_agent_narrow3ns; 40,000 acc, 6 cycles x 10, herald 42-52 kHz, shared OFF 1546+31)
+- 545+31 +2.33 +- 0.46 (z 5.1) | 547+4 **+1.81 +- 0.41 (z 4.5)** | 549+6 +1.19 (3.4) | 548+8 +1.15 (3.0) | 548+3 +0.05 +- 0.28 (0.2).
+- 547+4 and 548+3 end at the same 551 ns, so the gate-end cutoff is not what kills 548+3.
+- window_figures titles are wrong for these arms ("5474-5478 ns" for 547+4; OFF panel shows the ON width): label bug, not fixed.
+
+### T2 (16:16-16:45, 1616_agent_target4ns_long) 547 + 4 ns, 40,000 acc, 20 cycles x 50 = 1000 ON + 1000 OFF (OFF +5 us), ~59 k gates/s
+- net **+0.55 +- 0.09 spot hits/readout, z 6.4** (1.4e-5 per trigger): 3x below N1's 547+4 and ~6x below 546+31 (T1).
+- Per block (agent_scripts/block_signal.py): +3.39 +- 0.48 in c9 (= full 31 ns level), ~0 in c1/c2/c3/c6/c15/c17/c19, 0.5-1.4 in the
+  rest; far beyond counting noise. **The 4 ns gate catches the photons in some blocks and misses them in others**: the herald ->
+  gate latency moves by a few ns on a ~30 s - minutes scale (cf. session 6, "switching over seconds"). More readouts / accumulations
+  only average this (to ~1/6 today); they cannot fix it.
+- Background finding (agent_scripts/bg_vs_readout_time.py): ROI hits per readout away from the spot track the readout wall time
+  (corr 0.99 over 41 blocks), not the gate: a 27+4 gate (never fires) sits on the same line. OFF at +5 us makes readouts slower
+  (0.89 vs 0.70 s: the camera drops heralds while the late gate is pending), so per-readout ON - OFF over-subtracts (the all-blue
+  map). The spot score (template minus 4 control apertures) is barely affected: time-normalised +0.59 +- 0.08, z 7.3
+  (agent_scripts/time_normalised.py, figures/heralded_time_normalised.png). Hot pixels do not scale with time, so the map-level
+  fix is not perfect either. Use a short OFF shift (+1 us) or a pre-photon OFF gate so ON/OFF readout times match.
+
+### L1/L2 (16:35, 16:56; latency_map, latency_map2) stepped 4 ns gates 535-559 ns + 546+31 reference: inconclusive.
+- Both stopped on the readout-interval guard (1.11-1.29 s): herald fell to 27 kHz at the minimum (16:55, 102.15 deg) and swung
+  13-36 kHz between blocks. Even 546+31 gave only +1.04 / +0.09 (15,000 acc); no 4 ns arm above ~2 sigma.
+
+### Left: S.Pos2 102.148 deg (minimum, ~27 kHz at 16:55). Camera closed.
+### Plan
+  (1) Round spot: 546+31 ns (the photons always land inside it; spot background 0.24 vs +3.65/readout), many readouts, matched OFF
+      (+1 us). Optional: higher herald rate (session 6: ~199 kHz -> ~21 hits/readout) against Cameron's ~20 kHz trigger-error note.
+  (2) Narrow gate (3-4 ns) needs a stable herald -> gate latency. Lab: scope the herald pulse at TRIGGER IN against the camera's
+      gate monitor / Logic Out to see the latency jumps (size, timescale, camera vs herald pulse shape). Try delaying the herald
+      trigger in hardware (cable / delay generator) so the gate sits well past ~575 ns camera time. If the jumps are a few discrete
+      states, a ~10-12 ns gate covering them still cuts background ~3x vs 31 ns.
+  (3) Analysis: make matched-OFF / time-normalised background the default in target_image.py; fix window_figures titles.
