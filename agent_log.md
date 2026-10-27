@@ -678,3 +678,19 @@ Context (Tristan, APDs at the crystal-side couplers, max pump): 2 M idlers/s, 4 
       trigger in hardware (cable / delay generator) so the gate sits well past ~575 ns camera time. If the jumps are a few discrete
       states, a ~10-12 ns gate covering them still cuts background ~3x vs 31 ns.
   (3) Analysis: make matched-OFF / time-normalised background the default in target_image.py; fix window_figures titles.
+
+## 2026-10-27 session 11 (remote; Tristan: test Cameron's ~20 kHz trigger-error limit as the cause of the 4 ns gate drop-outs)
+Same settings in every run: 10,000 acc, arms 547+4 / 546+31 / OFF 1546+4 interleaved, 8 cycles x 30 readouts, spot (462, 460).
+Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the template spot score; chi2 of the 8 block means).
+- Waveplate: minimum ~5-10 kHz at 10:56 (102 deg), ~20 kHz by 11:16 (102.5 deg); --hold uses the newest calibration (session 9,
+  stale) and parked at 98.596 deg (~61 kHz). 15 kHz not reachable after 11:15.
+- 1059_agent_ratetest15k (meant 15 kHz; lock overshot, ran at ~34 k gates/s, 43 kHz after): 4 ns +0.30 +- 0.06 (z 4.9, chi2 10.7/7),
+  31 ns +0.51 +- 0.08; ratio **0.58 +- 0.15**, blocks consistent.
+- 1108_agent_ratetest60k (herald 59.8-62 kHz, camera took ~44 k gates/s): 4 ns +0.20 +- 0.05 (z 3.7, **chi2 27.7/7, p < 0.001**),
+  31 ns +0.48 +- 0.07 (chi2 11.6/7); ratio **0.41 +- 0.13**. The 4 ns blocks scatter beyond noise, the 31 ns blocks do not.
+- 1118 ratetest20k (20.6 kHz at start, 7.7 kHz at end, ~14 k gates/s): 4 ns +0.18 +- 0.13, 31 ns +0.26 +- 0.13 (z 2.0): too weak to
+  say anything (less heralded signal per trigger at low pump); stopped in cycle 8 on the 1.05 s readout guard.
+- Gates/s vs herald: at 60 kHz the camera accepted ~44 k gates/s (~26 % of heralds dropped, as for a ~5 us dead time per trigger).
+### Reading: suggestive, not conclusive. The 4 ns gate gets a steady ~60 % of the 31 ns signal at ~34 k gates/s, but drops out
+  block to block at ~44 k gates/s (and on 26 Oct at ~59 k gates/s, 1/6 on average). Consistent with Cameron's limit being about
+  trigger timing at high rate. Needs a clean low-rate point (15-20 kHz held for the whole run, with more readouts) to confirm.
