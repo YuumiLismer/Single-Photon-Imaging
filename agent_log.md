@@ -720,3 +720,25 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - Images: 2026-10-27/threshold_test_images.png.
 ### Reading: a lower threshold does not help the narrow gate; if anything it is worse (extra photon-less triggers, more block
   scatter). Keep 0.5 V. The latency jumps remain unexplained: scope the herald pulse vs the camera gate monitor.
+
+## 2026-10-27 session 12 (Tristan removed the lens in front of the camera: wide field for fringe patterns)
+- 1424 / 1429 beam checks (no lens, herald ~50 vs ~260 kHz): no compact spot; whole sensor shows a steady glow (equal in W
+  and Woff, not pump-dependent: pump_diff.png) with a dark disc ~100 px at ~(510, 500). Lab lights were off, so the glow is
+  stray light reaching the open photocathode. The disc appeared after the alignment diode was used: shadow or intensifier burn
+  (untested: move the object in front and see if the disc moves).
+- 1446_agent_diode_locate (agent_scripts/diode_locate.py, gain 1, Internal trigger, exposure ramp): diode spot centroid
+  **(298, 277)**, half-max region ~160 px across (x 218-378, y 198-355), outer glow ~300 px. Max 5,100 ADU at 10 us x 5000.
+- disc_c1..c8 (agent_scripts/disc_ab.py, 400 px ROI, 20,000 acc, re-locked 22-59 kHz, arms 546+31 / 1546+31 / 450+300 /
+  1450+300): **no heralded signal**. Plain aperture (half-max outline minus outside, ON-OFF paired per cycle,
+  agent_scripts/disc_aperture.py): 546+31 **-1.31 +- 0.89** photons/readout at 200 ADU (expected ~0.7 if as many photons
+  arrive as with the lens: 2.7/readout at 40k acc, ~half inside the half-max outline); 450+300 -2.98 +- 1.30 (negative
+  bias from slower OFF readouts, cycle 2: -91). disc_ab.py's template score is ~10x noisier than the plain aperture.
+- Background: ~98 % of hits are single pixels at ~235 ADU, scaling with readout wall time (corr 0.96-1.00), ~1,230/s in
+  the 400 px ROI at 200 ADU; likely CCD dark counts at -20 C. Real photons are also ~90 % single pixels, so cluster
+  filtering does not help.
+- **Hit threshold**: on the focused 1533 run (agent_scripts/threshold_compare.py, ring-subtracted r<=10): 200 ADU z 11.2,
+  30 ADU z 22.3, plain ADU sum z 22.8. Lower thresholds roughly double z for a compact spot. For the 20,000 px spot the
+  background grows as fast as the signal, so no gain there.
+- Sensor set point range -102..25 C (attrs.json); every script uses -20 C. Untested whether -30 C locks.
+### Next: shrink the spot (fewer pixels -> less background) as far as the fringes allow; test -30 C; use 30 ADU for compact
+  spots; ~1.5 h of ON/OFF at ~44 kHz would be needed to detect the current wide spot at z 5.
