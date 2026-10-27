@@ -757,3 +757,7 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - Per herald vs 26 Oct focused spot (same method): 30 ADU 3.5e-4 vs 7.9e-4, 200 ADU 3.0e-5 vs 6.8e-5: **~0.44x**. Possible
   causes: the spot sits near the dark disc (~(510, 500)), fibre coupling, or a pump-side change. Figure: 1600_agent_spot2_c1/
   figures/spot_aperture.png.
+- L (16:22-16:42) long run spotlong_c1..c8 (50 ON + 50 OFF per cycle, 30,000 acc, re-locked, 49-85 kHz) pooled with spot2_c1..c6:
+  **550 ON + 550 OFF readouts: 30 ADU +10.80 +- 0.53 hits/readout (r <= 10 px), z 20.3** (3.6e-4/trigger, all 14 cycles
+  +6.5..+14.3); 200 ADU +0.60 +- 0.06, z 9.6. Round spot (agent_scripts/spot_image.py): centroid (512.2, 453.3),
+  sigma 7.35 x 7.17 px, axis ratio 0.97; radial profile follows the diode spot. Figure: 1622_agent_spotlong_c1/figures/spot_image.png.
