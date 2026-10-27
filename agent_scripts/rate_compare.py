@@ -1,12 +1,18 @@
-"""Rate test summary: per arm mean net spot score (vs OFF), ratio 4 ns / 31 ns, block chi2, gates/s."""
+"""Rate test summary: per arm mean net spot score (vs OFF), ratio 4 ns / 31 ns, block chi2, gates/s.
+    python agent_scripts/rate_compare.py EXP [EXP ...]          # each experiment on its own
+    python agent_scripts/rate_compare.py --merge EXP [EXP ...]  # all runs pooled (one cycle per experiment, rate re-locked between)"""
 import sys, numpy as np
 sys.path.insert(0, r"C:/Users/ReschLab/Single-Photon-Imaging"); sys.path.insert(0, r"C:/Users/ReschLab/Single-Photon-Imaging/agent_scripts")
 import hoi_troubleshoot as ht
 from analyze_ab import beam_template
 from scipy.stats import chi2
 TEMPLATE = r"C:/Users/ReschLab/Desktop/HOI_freshstaret/data/troubleshoot/2026-10-26/1525_agent_beam_centered_min"
-for exp in sys.argv[1:]:
-    rs = ht.load_runs(exp)
+args = sys.argv[1:]
+merge = args[:1] == ["--merge"]
+exps = args[1:] if merge else args
+groups = [(f"{len(exps)} merged", exps)] if merge else [(e, [e]) for e in exps]
+for exp, folders in groups:
+    rs = [r for f in folders for r in ht.load_runs(f)]
     w, _ = beam_template(rs[0]["meta"]["roi"], (462, 460), template_exp=TEMPLATE)
     eff = (w * w / w.sum()).sum()
     ctrl = [np.roll(np.roll(w, dy, 0), dx, 1) for dx, dy in ((45, 45), (-45, 45), (45, -45), (-45, -45))]

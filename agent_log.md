@@ -694,3 +694,16 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 ### Reading: suggestive, not conclusive. The 4 ns gate gets a steady ~60 % of the 31 ns signal at ~34 k gates/s, but drops out
   block to block at ~44 k gates/s (and on 26 Oct at ~59 k gates/s, 1/6 on average). Consistent with Cameron's limit being about
   trigger timing at high rate. Needs a clean low-rate point (15-20 kHz held for the whole run, with more readouts) to confirm.
+
+### R2 (11:30-12:55) Rate test redone with the rate re-locked before every cycle (Tristan: "you can adjust the HWP as much as you want")
+- Fresh calibration (11:30): min 6.0 kHz at 12.2 deg mod 90 (~102.2 deg), max ~2.03 MHz. Then 16 x [hold 30 s in band, measure,
+  multi_ab --cycles 1 (547+4 / 546+31 / OFF 1546+4, 10,000 acc, 30 readouts each)] per rate.
+- 20 kHz (ratehold20k_c1..16): rate before each cycle 16.5-20.9 kHz, ~19.4 k gates/s. 4 ns +0.36 +- 0.07 (z 5.3, chi2 49/15
+  p < 0.001), 31 ns +0.49 +- 0.07 (chi2 13.7/15); ratio **0.73 +- 0.18**. 4 ns at ~0 in cycles 4, 8, 9; ~equal to 31 ns in most others.
+- 60 kHz (ratehold60k_c1..16): 52.5-74.6 kHz, ~44.3 k gates/s. 4 ns +0.21 +- 0.05 (z 4.6, chi2 22.9/15 p 0.09), 31 ns +0.38 +- 0.05
+  (chi2 13.7/15); ratio **0.57 +- 0.15**.
+- Images: 2026-10-27/rate_test_images_relocked.png (agent_scripts/rate_images.py; morning runs: rate_test_images.png).
+### Reading: with the rate held, 20 vs 60 kHz differ by 0.16 +- 0.23 in the 4 ns / 31 ns ratio: no significant rate effect. The
+  4 ns gate misses whole cycles at both rates (at 20 kHz even more clearly by chi2). So the herald rate is at most a minor factor;
+  the latency jumps happen at Cameron's limit too. Next: scope the herald pulse vs the camera gate monitor (lab), or try a cleaner/
+  bigger herald pulse (0.5 V into 50 ohm at a 0.5 V threshold) before blaming the camera.
