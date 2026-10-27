@@ -761,3 +761,15 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   **550 ON + 550 OFF readouts: 30 ADU +10.80 +- 0.53 hits/readout (r <= 10 px), z 20.3** (3.6e-4/trigger, all 14 cycles
   +6.5..+14.3); 200 ADU +0.60 +- 0.06, z 9.6. Round spot (agent_scripts/spot_image.py): centroid (512.2, 453.3),
   sigma 7.35 x 7.17 px, axis ratio 0.97; radial profile follows the diode spot. Figure: 1622_agent_spotlong_c1/figures/spot_image.png.
+
+### G (16:45-17:35) narrow gates on the compact spot (513, 454)
+- gatew_c1..c3 (30,000 acc, ~76 k gates/s): 546+31 +12.4 +- 1.3 (z 9.9) | 546+8 +1.2 +- 1.1 | 547+4 +1.1 +- 1.1 hits/readout
+  (30 ADU, r <= 10): narrow gates keep ~10 %; their noise is the same as 31 ns (background is not gate-borne).
+- tscan_c1..c2: 546+8 / 553+8 / 560+8 / 567+8 all ~0 (-0.7..-2.0 +- 1.4) while 546+31 +13.2 +- 1.8: **narrow gates ending
+  <= 575 ns do not fire** (session 6 gate-end cutoff; this morning gates ending at 551 still fired part-time).
+- startscan_c1..c6, gate end fixed at 587 ns (150 ON readouts per arm, OFF 1546+41): start 540 +10.5 +- 1.0 | 546 +11.8 +- 0.9 |
+  550 +5.4 +- 0.8 | 554 +0.5 +- 0.8 | 558 +2.1 +- 0.8 | 566 +0.8 +- 0.8. **Photons arrive at 546-554 ns** (~55 % in 546-550,
+  ~40 % in 550-554), as before. A 3-4 ns gate there catches at most ~half and ends before the cutoff, so it cannot open.
+- To use narrow gates: delay the PHOTONS, not the trigger (a later trigger makes them arrive earlier): ~10 m more signal-arm
+  fibre (~5 ns/m) puts them at ~600 ns, past the cutoff (551-575 ns across sessions). Correction to sessions 10-11 notes
+  that suggested delaying the herald trigger.
