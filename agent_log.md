@@ -742,3 +742,18 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - Sensor set point range -102..25 C (attrs.json); every script uses -20 C. Untested whether -30 C locks.
 ### Next: shrink the spot (fewer pixels -> less background) as far as the fringes allow; test -30 C; use 30 ADU for compact
   spots; ~1.5 h of ON/OFF at ~44 kHz would be needed to detect the current wide spot at z 5.
+- 1537_agent_dark_vs_temp (agent_scripts/dark_vs_temp.py, OFF gate 1546+31, 400 px ROI, alternating set points): single-px hits
+  498 / 504 per s at -20 C vs 565 / 552 at -25 C: **not dark current** (cooling does not help). -30 C does not lock (bottoms at
+  -28 C, drifts to -27 C, 15 min). Same ROI gave ~1,230/s at 14:52-15:30: the background varies 2.5x within an hour, most likely
+  stray light leaking through the closed intensifier (scales with readout wall time). Test: cap / enclose fibre-to-camera path.
+- Correction to session 11: the "~44,260 gates/s camera ceiling" is a minimum readout time (10,000 acc / 44,260 = 0.226 s),
+  not a trigger limit: with 30,000 acc the camera took ~64,000 gates/s.
+
+### S2 (16:00-16:12) compact spot after Tristan re-aligned (1556_agent_diode2_locate: diode at **(513, 454)**, ~18 px FWHM)
+- spot2_c1..c6 (disc_ab.py, 150 px ROI, 30,000 acc, 546+31 vs 1546+31, re-locked 30-67 kHz, ~60.7 k gates/s median):
+  agent_scripts/spot_aperture.py, r <= 10 px minus ring 35-65 px, ON-OFF paired per cycle:
+  **30 ADU: +10.4 +- 1.0 hits/readout, z 10.3** (3.5e-4/trigger; cycles +6.5 +8.8 +13.4 +11.7 +7.8 +14.3);
+  200 ADU: +0.89 +- 0.17, z 5.4 (3.0e-5/trigger). Heralded single photons at the diode position.
+- Per herald vs 26 Oct focused spot (same method): 30 ADU 3.5e-4 vs 7.9e-4, 200 ADU 3.0e-5 vs 6.8e-5: **~0.44x**. Possible
+  causes: the spot sits near the dark disc (~(510, 500)), fibre coupling, or a pump-side change. Figure: 1600_agent_spot2_c1/
+  figures/spot_aperture.png.
