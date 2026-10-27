@@ -707,3 +707,16 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   4 ns gate misses whole cycles at both rates (at 20 kHz even more clearly by chi2). So the herald rate is at most a minor factor;
   the latency jumps happen at Cameron's limit too. Next: scope the herald pulse vs the camera gate monitor (lab), or try a cleaner/
   bigger herald pulse (0.5 V into 50 ohm at a 0.5 V threshold) before blaming the camera.
+
+### TH (12:58-13:50) Trigger threshold 0.5 V vs 0.25 V (Tristan's idea: trigger on the steep part of the ~0.5 V herald edge)
+- thr20k_c1..12: per cycle [hold 18-22 kHz, measure, multi_ab --cycles 1 with 547+4 / 546+31 / OFF 1546+4 at t0.5 and at t0.25].
+- The lock held 18.6-20.2 kHz for c1-c4, then parked at 102.198 deg (the fitted minimum) while the rate there rose 24 -> 65 kHz
+  (c5-c12): the herald floor itself climbed. Both thresholds are interleaved in every cycle, so the comparison still holds.
+- 0.5 V:  4 ns +0.28 +- 0.06 (chi2 7.9/11), 31 ns +0.48 +- 0.07; ratio **0.60 +- 0.16**.
+- 0.25 V: 4 ns +0.12 +- 0.06 (chi2 25.5/11 p 0.008), 31 ns +0.35 +- 0.07; ratio **0.35 +- 0.18**.
+- Gates/s: 0.25 V takes 2-15 % more triggers than 0.5 V in the same cycle (extra triggers with no photon: noise/ringing).
+- **Camera trigger ceiling: ~44,260 gates/s**, identical in both thresholds whenever the herald was above it (c8-c10; also the
+  60 kHz runs, median 44,253-44,260). Likely the concrete form of Cameron's trigger limit (at this gate setting, 10,000 acc).
+- Images: 2026-10-27/threshold_test_images.png.
+### Reading: a lower threshold does not help the narrow gate; if anything it is worse (extra photon-less triggers, more block
+  scatter). Keep 0.5 V. The latency jumps remain unexplained: scope the herald pulse vs the camera gate monitor.

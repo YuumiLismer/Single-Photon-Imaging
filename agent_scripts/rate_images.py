@@ -1,6 +1,7 @@
 """Side-by-side heralded images (ON - OFF photon hits per readout) for rate-test experiments:
 one row per experiment (or merged group), columns 4 ns and 31 ns arms, shared colour scale.
-    python agent_scripts/rate_images.py OUT.png "label=EXP[,EXP...]" ["label=EXP..."]"""
+    python agent_scripts/rate_images.py OUT.png "label=EXP[,EXP...]" ["label=EXP..."]
+    "label|t025=EXP,..." keeps only runs whose label contains t025 (e.g. one trigger threshold)"""
 import sys, numpy as np
 sys.path.insert(0, r"C:/Users/ReschLab/Single-Photon-Imaging")
 import hoi_troubleshoot as ht
@@ -9,7 +10,8 @@ from scipy.ndimage import gaussian_filter
 out, rows = sys.argv[1], [a.split("=", 1) for a in sys.argv[2:]]
 maps = []
 for label, folders in rows:
-    rs = [r for f in folders.split(",") for r in ht.load_runs(f)]
+    label, _, only = label.partition("|")
+    rs = [r for f in folders.split(",") for r in ht.load_runs(f) if not only or only in r["meta"]["settings"]["label"]]
     acc = {}
     for r in rs:
         lab = r["meta"]["settings"]["label"]; arm = "off" if "off" in lab else ("w4" if "w4" in lab else "w31")
