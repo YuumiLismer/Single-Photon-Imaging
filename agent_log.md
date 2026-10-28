@@ -773,3 +773,13 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - To use narrow gates: delay the PHOTONS, not the trigger (a later trigger makes them arrive earlier): ~10 m more signal-arm
   fibre (~5 ns/m) puts them at ~600 ns, past the cutoff (551-575 ns across sessions). Correction to sessions 10-11 notes
   that suggested delaying the herald trigger.
+
+## 2026-10-28 session 13 (Tristan added a long fibre spool, length unknown, to the signal arm)
+- Herald 142 kHz at 93.0 deg on arrival; locked to 50-65 kHz (~95.7-97.1 deg) before each run.
+- 0937_agent_ladder_c1: 2 us gates 546..18546 ns (15k acc, 10 readouts each): nothing clear (all within ~2 sigma; noise ~2
+  hits/readout vs ~5 expected). Wide gates do not add much background: the ring level is set by readout time.
+- 0940_agent_ladder250_c1: 250 ns gates 546..3546 ns (30k acc, 15 readouts): max +4.2 +- 2 vs ~10 expected (yesterday 546+31:
+  +14.1 at 30k acc). New script agent_scripts/ladder_aperture.py (every arm vs the ladder median).
+- 0944/0946/0948_agent_huge_c1..c3: 546+20000 vs 40546+20000 ns, ROI 600 px, 60+60 readouts: spot (513,454) +1.7 vs ~5.4 +- 1.3
+  expected, no compact excess anywhere in x,y 212-812. => photons not arriving within 20.5 us anywhere in that area:
+  splice/connector loss or moved fibre end, not a delay problem. Tristan cleaning the connectors; next: diode through the new path.
