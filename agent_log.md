@@ -801,3 +801,9 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - Waveplate recalibrated after homing (1356): min 79 kHz at 97.45 deg (mod 90), 501 kHz at 80 deg; the floor rose from ~55 kHz
   (12:50) to ~79 kHz (13:56). The old calibration's min (~102 deg) is stale.
 - New: agent_scripts/ladder_map.py (per-arm excess map vs the other arms over a large ROI).
+- 1349 narrow_c1..c6 (herald 74-76 kHz at 99.5 deg; per-width controls at +1 us): 546+31 +4.57 +- 0.98 | 546+16 +2.72 +- 1.03 |
+  **546+8 +3.52 +- 1.04 (z 3.4, ~0.8 of 31 ns)** | 546+4 +0.73 +- 0.96. The 8 ns gate (end 554) fired in this window.
+- 1404 fine_c1..c8 (herald 73-75 kHz): 546+8 +1.22 +- 0.79 | 545+6 +1.95 +- 0.82 | 544+6 +2.37 +- 0.84 | 545+5 +1.13 +- 0.86 |
+  545+4 +0.34 +- 0.83 | 544+4 -0.72 +- 0.84. Narrow gates positive in cycles 1-5, ~0 in cycles 6-8: the gate-end cutoff
+  moved later again (same intermittency as sessions 6/10). 8 ns works part-time only; 31 ns is the narrowest reliable gate
+  while the photons arrive at 546-550 ns. Fix unchanged: photons must arrive after ~580 ns (more signal-arm delay).
