@@ -783,3 +783,21 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - 0944/0946/0948_agent_huge_c1..c3: 546+20000 vs 40546+20000 ns, ROI 600 px, 60+60 readouts: spot (513,454) +1.7 vs ~5.4 +- 1.3
   expected, no compact excess anywhere in x,y 212-812. => photons not arriving within 20.5 us anywhere in that area:
   splice/connector loss or moved fibre end, not a delay problem. Tristan cleaning the connectors; next: diode through the new path.
+
+## 2026-11-02 session 14 (spool of ~100 +- 50 m reportedly added to the signal arm; goal: find the delay, narrowest gate)
+- After a lab power event: XPS groups S and P in "not initialized (emergency brake)"; homed group S only (S.Pos1 stayed at 0),
+  S.Pos2 found at -42 deg (not moved by the agent). Camera was off, then took ~1 min to enumerate. Herald input had 0 triggers
+  (0.1 V both edges, any S.Pos2 angle) until Tristan restored the herald chain at ~12:45.
+- 1252_agent_q10u_c1..c4: 10 us gates 0.5-40.5 us, ROI 600: every arm shows the same ~+20 hits/readout spot at (513, 454) =
+  un-heralded signal photons (light passes the spool; fibre end unchanged). No arm stands out pooled (30-40 us +1.2 sigma).
+  Long gates bury the heralded photons under the un-heralded ones: search with short gates.
+- 1301_agent_l250_c1..c4: 250 ns gates 546-2546 ns: only 546-796 stands out (+3.2 +- 0.9 over median).
+- 1312_agent_t31_c1..c3: 31 ns gates 546-794 ns: only 546+31 stands out (+3.2 +- 1.1 over median).
+- 1320_agent_early_c1..c4, gates ending at 577 starting 546/516/476/346 (each vs +1 us control): +4.9/+3.7/+4.7/+3.6 (+-1.3):
+  nothing before 546 ns.
+- 13:31 sscan_c1..c6, end fixed 587, OFF 1546+41: start 540 +4.0, 546 +5.0, 550 +1.5, 554-570 +1.1..+1.5 (+-1.0):
+  **photons arrive at 546-550 ns (548 +- 2 ns), unchanged from last week**: the spool adds no delay to the photons that reach
+  the camera (replaced the old fibre, or not in the heralded path?). Heralded rate 1.4-1.7e-4/trigger, ~0.4x last week.
+- Waveplate recalibrated after homing (1356): min 79 kHz at 97.45 deg (mod 90), 501 kHz at 80 deg; the floor rose from ~55 kHz
+  (12:50) to ~79 kHz (13:56). The old calibration's min (~102 deg) is stale.
+- New: agent_scripts/ladder_map.py (per-arm excess map vs the other arms over a large ROI).
