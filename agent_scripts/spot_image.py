@@ -24,6 +24,7 @@ p.add_argument("--diode", default=None)
 p.add_argument("--thr", type=float, default=30)
 p.add_argument("--on", default="on31"); p.add_argument("--off", default="off31")
 p.add_argument("--zoom", type=int, default=30)
+p.add_argument("--wiener", type=int, default=0, help="adds a panel: adaptive (local) Wiener filter, this window in px")
 a = p.parse_args()
 
 hon = hoff = 0; non = noff = 0; roi = None
@@ -56,14 +57,35 @@ perr = [diff[(d >= r0) & (d < r0 + 2)].std() / np.sqrt(((d >= r0) & (d < r0 + 2)
 res = dict(readouts_on=non, readouts_off=noff, thr=a.thr, centroid=[round(float(cx), 1), round(float(cy), 1)],
            sigma_xy_px=[round(float(sx), 2), round(float(sy), 2)], axis_ratio=round(ell, 2),
            net_hits_r10_per_readout=float(diff[d <= 10].sum()))
-fig = plt.figure(figsize=(17, 5.6))
-ax1 = fig.add_subplot(1, 3, 1); ax2 = fig.add_subplot(1, 3, 2); ax3 = fig.add_subplot(1, 3, 3)
+npan = 4 if a.wiener else 3
+fig = plt.figure(figsize=(5.7 * npan, 5.6))
+ax1 = fig.add_subplot(1, npan, 1); ax2 = fig.add_subplot(1, npan, 2); ax3 = fig.add_subplot(1, npan, npan)
 z = a.zoom
 sl = (slice(a.spot[1] - roi[1] - z, a.spot[1] - roi[1] + z), slice(a.spot[0] - roi[0] - z, a.spot[0] - roi[0] + z))
 ext = [a.spot[0] - z, a.spot[0] + z, a.spot[1] + z, a.spot[1] - z]
-for ax, s, t in ((ax1, 1.0, "1 px smooth"), (ax2, 2.0, "2 px smooth")):
-    im = gaussian_filter(diff, s)[sl]
+panels = [(ax1, lambda m: gaussian_filter(m, 1.0), "1 px smooth"), (ax2, lambda m: gaussian_filter(m, 2.0), "2 px smooth")]
+if a.wiener:
+    def wiener_fft(m):
+        """Empirical Fourier Wiener filter: noise = white, from the per-pixel variance far from the spot; signal power
+        = the image's own power spectrum (smoothed over --wiener px in k) minus the noise level. No shape prior."""
+        far = d > 35                                           # remove row/column offsets (readout stripes) first
+        m = m - np.array([r[f].mean() for r, f in zip(m, far)])[:, None]
+        m = m - np.array([c[f].mean() for c, f in zip(m.T, far.T)])[None, :]
+        F = np.fft.fft2(m)
+        N = float(m[far].var()) * m.size
+        # isotropic: signal power from the ring-averaged spectrum (robust at low counts), so H is an optimal
+        # direction-independent low-pass; it cannot make the spot rounder than any Gaussian smoothing would
+        ky, kx = np.meshgrid(np.fft.fftfreq(m.shape[0]), np.fft.fftfreq(m.shape[1]), indexing="ij")
+        kb = np.minimum((np.hypot(kx, ky) * m.shape[0] / a.wiener).astype(int), 10_000)
+        P = np.bincount(kb.ravel(), (np.abs(F) ** 2).ravel()) / np.bincount(kb.ravel())
+        S = np.clip(P - N, 0, None)[kb]
+        return np.real(np.fft.ifft2(F * S / (S + N)))
+    panels.append((fig.add_subplot(1, npan, 3), wiener_fft, "Wiener filter (Fourier, empirical)"))
+for ax, f, t in panels:
+    im = f(diff)[sl]
     h = ax.imshow(im, cmap="inferno", vmin=0, vmax=im.max(), extent=ext, interpolation="nearest")
+    # 2-sigma circle at the measured centroid (contains ~86 % of a Gaussian spot)
+    ax.add_patch(plt.Circle((cx, cy), 2 * np.sqrt(sx * sy), fill=False, color="cyan", lw=1.2, ls="--"))
     ax.set_title(f"heralded photons (ON - OFF), {t}"); ax.set_xlabel("x (px)"); ax.set_ylabel("y (px)")
     plt.colorbar(h, ax=ax, label="photon hits / px / readout")
 ax3.errorbar(rb[:-1] + 1, prof, perr, fmt="o-", color="C3", label="heralded photons (ON - OFF)")
