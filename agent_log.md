@@ -807,3 +807,14 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   545+4 +0.34 +- 0.83 | 544+4 -0.72 +- 0.84. Narrow gates positive in cycles 1-5, ~0 in cycles 6-8: the gate-end cutoff
   moved later again (same intermittency as sessions 6/10). 8 ns works part-time only; 31 ns is the narrowest reliable gate
   while the photons arrive at 546-550 ns. Fix unchanged: photons must arrive after ~580 ns (more signal-arm delay).
+- 16:00 waveplate fine sweep 93-102 deg: flat floor ~62 kHz over 95.5-98 deg (fit B 61 kHz, A 1.52 MHz, theta0 51.9 deg).
+- New: spot_image.py --wiener N (isotropic empirical Fourier Wiener filter after row/column destriping) and a 2-sigma circle
+  at the centroid; quoted glob patterns for the experiment folders are expanded inside the script (Windows arg-list limit).
+
+## 2026-11-02/03 session 15 (long 31 ns run for the final photon image)
+- 1635_agent_long31_c1 .. 0658_agent_long31_c500 (Nov 2 16:35 - Nov 3 06:59): 500 cycles x 25+25 readouts, ON 546+31 vs
+  OFF 1546+31, ROI 150 at (513, 454), herald re-locked before every cycle (S.Pos2 ~97 deg, at the floor all night).
+- Herald floor drifted 33-45 kHz (18-21 h) -> 50-60 kHz (midnight) -> ~76 kHz (04-07 h); never reachable to 20 kHz.
+- **Pooled 12500 ON + 12500 OFF: centroid (511.2, 453.4), sigma 6.45 x 6.42 px, axis ratio 0.90, net +3.60 hits/readout in
+  r<=10 px.** Wiener panel: filled round disc on a flat background; radial profile matches the diode spot to ~20 px, zero
+  beyond. Image: 2026-11-02/1635_agent_long31_c1/figures/spot_image.png. At 1975 readouts/gate: sigma 7.1 x 7.3, ratio 0.96.

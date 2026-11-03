@@ -26,6 +26,8 @@ p.add_argument("--on", default="on31"); p.add_argument("--off", default="off31")
 p.add_argument("--zoom", type=int, default=30)
 p.add_argument("--wiener", type=int, default=0, help="adds a panel: adaptive (local) Wiener filter, this window in px")
 a = p.parse_args()
+# quoted glob patterns are expanded here (hundreds of experiment folders overflow the Windows command line)
+a.exps = [str(q) for e in a.exps for q in (sorted(pathlib.Path(e).parent.glob(pathlib.Path(e).name)) if "*" in e else [e])]
 
 hon = hoff = 0; non = noff = 0; roi = None
 for f in a.exps:
