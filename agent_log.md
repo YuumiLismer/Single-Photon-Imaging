@@ -833,3 +833,8 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   the visibility 0.20 <-> 0.08 (beam walk). Environmental drift during that run (corrections removed): range 5.4 rad.
 - Fix to try: approach every correction target from below (as the calibration does), or use a slide near normal incidence
   / a thinner slide so 1 rad needs >> 0.01 deg.
+- 2026-11-13 1019_agent_phase (LOCKED 1 h, backlash fix 06fc25d: every move approaches from below, 8-frame checks, tol 0.3):
+  **the phase stays within +-pi/2 of the t = 0 picture for 100 % of frames, rms 0.48 rad, r >= 0.9 throughout**, vs a
+  3.3 rad uncorrected drift in the same hour. 8/11 checks inside tol; misses (0.39-0.87 rad) when the needed move is below
+  the stage's ~0.01 deg step (0.29 rad), and the slide sometimes jumps by ~2pi (0.2 deg) to an equivalent fringe.
+  Visibility dips to 0.14 while the slide sits off its best spot. Next: 5 h locked run with this fix.
