@@ -43,6 +43,8 @@ p.add_argument("--free", action="store_true", help="record only, no corrections"
 p.add_argument("--tol", type=float, default=0.15, help="rad: phase error accepted at a check")
 p.add_argument("--max-step", type=float, default=1.0, help="deg: largest single slide move")
 p.add_argument("--range", type=float, default=3.0, help="deg: a slide may move this far from its start")
+p.add_argument("--backlash", type=float, default=0.2, help="deg: every correction approaches its target from below by this much")
+p.add_argument("--navg", type=int, default=4, help="frames averaged per phase measurement at a check")
 p.add_argument("--no-window", action="store_true")
 a = p.parse_args()
 if not a.no_window:
@@ -228,7 +230,7 @@ try:
             if not a.free and t - last_check >= a.check_every:
                 last_check = t
                 for it in range(6):                                 # correct until back at the t = 0 picture
-                    err, img = mean_phase(4)
+                    err, img = mean_phase(a.navg)
                     if it == 0:                                     # drift up to the moment we start moving
                         unw += wrap(err - prev)
                     if abs(err) < a.tol:
@@ -237,13 +239,15 @@ try:
                         d = float(np.clip(-err / slopes[pos], -a.max_step, a.max_step))
                         tgt = wps[pos].position() + d
                         if abs(tgt - th_start[pos]) <= a.range:
+                            if d < 0:                               # same approach direction as the calibration
+                                wps[pos].move_to(tgt - a.backlash)
                             wps[pos].move_to(tgt); applied += d * slopes[pos]
                             break
                     else:
                         print("all slides at the end of their range", flush=True); break
                     frame(time.time())
                 else:
-                    err, img = mean_phase(4)
+                    err, img = mean_phase(a.navg)
                 prev = err                                          # the correction jump is not drift
                 print(f"{time.strftime('%H:%M:%S')} check: error after {it} moves {err:+.3f} rad, r {fr_.measure(img)[3]:+.3f}, "
                       f"slides {[round(wps[q].position(), 4) for q in a.lock]}", flush=True)
