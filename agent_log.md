@@ -818,3 +818,18 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
 - **Pooled 12500 ON + 12500 OFF: centroid (511.2, 453.4), sigma 6.45 x 6.42 px, axis ratio 0.90, net +3.60 hits/readout in
   r<=10 px.** Wiener panel: filled round disc on a flat background; radial profile matches the diode spot to ~20 px, zero
   beyond. Image: 2026-11-02/1635_agent_long31_c1/figures/spot_image.png. At 1975 readouts/gate: sigma 7.1 x 7.3, ratio 0.96.
+
+## 2026-11-12/13 session 16 (two-path fringe phase stability; slides P.Pos1 = slot 3, P.Pos2 = slot 4)
+- Interference restored after the user removed the path-1 shutter: fringe period 47-50 px, stripes at -13 deg, profile
+  visibility 0.15-0.20. P stages referenced in place (user's angles = 0). S.Pos2 now reads 0 after homing: recalibrate the
+  herald HWP before any photon run.
+- 1413_agent_phase_cal: P.Pos1 -28.6 rad/deg, P.Pos2 +28.4 rad/deg (pi = 0.11 deg), linear, approached from below.
+- 1415_agent_phase (FREE, 5 h): drift +8 rad in the first 70 min (warm-up), then wanders over 5.5 rad (rms 0.9) with a
+  ~30-40 min oscillation; rms phase change 0.6 / 0.8 / 1.3 / 1.7 rad over 1 / 5 / 15 / 60 min; per-frame noise 0.1 rad.
+  Visibility oscillates 0.10-0.18 with the phase.
+- 1915_agent_phase (LOCKED, check every 5 min, P.Pos1 only): **the lock did not work**: the error after 5 correction moves
+  was often 1-2.8 rad (r 0.68-0.85). Cause: the correction moves go straight to the target in both directions, so the
+  stage backlash (>~0.05 deg = >1.4 rad) and the ~0.01 deg step (0.29 rad) dominate at 28 rad/deg; slide moves also changed
+  the visibility 0.20 <-> 0.08 (beam walk). Environmental drift during that run (corrections removed): range 5.4 rad.
+- Fix to try: approach every correction target from below (as the calibration does), or use a slide near normal incidence
+  / a thinner slide so 1 rad needs >> 0.01 deg.
