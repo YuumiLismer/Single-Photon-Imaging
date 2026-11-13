@@ -115,6 +115,26 @@ def start():
     cam.start_acquisition()
 
 
+def restart(tries=10):
+    """Restart the acquisition; if the camera refuses (e.g. CommitParameters fails), close and reopen it."""
+    global cam
+    for k in range(tries):
+        try:
+            start(); return
+        except Exception as e:
+            print(f"{time.strftime('%H:%M:%S')} restart {k + 1} failed ({e}); reopening the camera", flush=True)
+            try:
+                cam.close()
+            except Exception:
+                pass
+            time.sleep(10)
+            try:
+                cam, _ = ht.open_camera()
+            except Exception as e2:
+                print(f"  reopen failed: {e2}", flush=True)
+    raise RuntimeError("camera did not come back")
+
+
 def frame(fresh_after=None):
     """Next frame (median-subtracted). fresh_after: discard frames that may have started before this time."""
     while True:
@@ -126,13 +146,15 @@ def frame(fresh_after=None):
             fr = cam.read_multiple_images()
         except Exception as e:                                 # acquisition dropped: restart it
             print(f"{time.strftime('%H:%M:%S')} camera error, restarting: {e}", flush=True)
-            start(); continue
+            restart(); continue
         if not fr:
             continue
         t = time.time()
         if fresh_after is not None and t - fresh_after < 1.2 * a.acc / 10_000 + 0.1:
             continue
         img = np.asarray(fr[-1], dtype=float)
+        if not np.isfinite(img).all() or img.max() > 1e6:      # corrupt frame (seen just before a camera failure)
+            continue
         if (img >= SAT_ADU).sum() > 25:
             print("WARNING: saturating pixels (reduce the light or --acc)", flush=True)
         return t, img - np.median(img)

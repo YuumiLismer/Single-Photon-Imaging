@@ -838,3 +838,9 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   3.3 rad uncorrected drift in the same hour. 8/11 checks inside tol; misses (0.39-0.87 rad) when the needed move is below
   the stage's ~0.01 deg step (0.29 rad), and the slide sometimes jumps by ~2pi (0.2 deg) to an equivalent fringe.
   Visibility dips to 0.14 while the slide sits off its best spot. Next: 5 h locked run with this fix.
+- 2026-11-13 1313_agent_phase (LOCKED, planned 5 h, same settings): ran 249 min, then a camera error
+  (AcquisitionNotInProgress, the restart's CommitParameters failed) ended it; the last ~10 frames were corrupt (cut).
+  **49/49 checks in tolerance (worst 0.29 rad), 35 needed no move; phase rms 0.38 rad, within pi/2 for 99.93 % and
+  within pi/4 for 95.4 % of frames, r >= 0.7 (mostly > 0.95), visibility 0.14-0.17.** Caveat: the room was calm (uncorrected
+  drift range 3.2 rad in 4 h vs 11 rad on Nov 12), so the slide only moved +-0.03 deg around 0.23 deg.
+  phase_lock.py now reopens the camera when a restart fails and skips corrupt frames.
