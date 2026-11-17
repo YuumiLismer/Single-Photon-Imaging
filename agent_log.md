@@ -844,3 +844,19 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   within pi/4 for 95.4 % of frames, r >= 0.7 (mostly > 0.95), visibility 0.14-0.17.** Caveat: the room was calm (uncorrected
   drift range 3.2 rad in 4 h vs 11 rad on Nov 12), so the slide only moved +-0.03 deg around 0.23 deg.
   phase_lock.py now reopens the camera when a restart fails and skips corrupt frames.
+
+## 2026-11-16/17 session 17 (single-photon interference attempt; source re-connected, focusing lens removed)
+- 13:45-14:51 no triggers at TRIGGER IN (0 in every 10 s) until Tristan fixed the herald path in the lab; then 864 kHz.
+- P group had lost its reference: initialized and referenced in place (no motion), P.Pos1/2 = 0.
+- 1453 waveplate sweep (S.Pos2, -30..+15 deg): 868 kHz at -30, min ~12 kHz near 5 deg (cos^2 fit floor of 60 kHz is wrong:
+  the real minimum is sharper). Parked at 4.96 deg: 16.2 kHz.
+- spi_c1..c104 (disc_ab.py, ROI 300 at the diode beam (598, 664), 30,000 acc, ON 546+31 vs OFF 1546+31, track-min before
+  every cycle, 14:56 - 21:05): herald floor 5.5 -> 18 kHz (15:30) -> 14-17 kHz -> 20.8 kHz (21:05, guard stopped the chain).
+  **2600 ON + 2600 OFF readouts, diode-weighted net +1.7 +- 3.0 photons/readout in the beam (expected ~4-5): no detection.**
+  Background: 0.31-0.34 hits/px/readout at thr 30 (Nov 2: 0.14-0.17), same in the evening, so not just room light.
+  Without the lens the photons cover ~18,000 px (Nov 2: ~300 px), so the background noise is ~8x larger per photon.
+  Gate 546+31 is kept: removing a lens shifts the arrival time by << 1 ns.
+- Overnight resume (wait while the floor > 20 kHz): 0 cycles; the floor rose 21 -> 33 (22:00) -> 53-65 kHz (23:00-07:00),
+  as on Nov 2/3 (33 -> 76 kHz). The 20 kHz limit is only reachable for a few hours after the source is aligned.
+- Next: shrink the fringe pattern on the camera (lens; stripes ~10 px instead of 47) so the photons cover ~20x fewer pixels,
+  then a short ON/OFF check and a fringe run in the afternoon while the floor is still < 20 kHz.
