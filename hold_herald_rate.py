@@ -7,6 +7,7 @@ the PI-MAX4 itself (gain 1, 3 ns gate: light-safe).
     python hold_herald_rate.py --calibrate                      # sweep 0..45 deg from the current angle, fit, return
     python hold_herald_rate.py --hold --low 15e3 --high 20e3 --minutes 30
     python hold_herald_rate.py --calibrate --hold --minutes 30  # both
+    python hold_herald_rate.py --find-min                       # full-period sweep + fine scan, park at the minimum
 
 Calibration fits  rate(theta) = B + A cos^2(2 (theta - theta0))  (HWP in front of a polarizer/PBS)
 and saves it to <experiment>/figures/waveplate_calibration.json plus a plot. The hold loop
@@ -297,6 +298,30 @@ def track_min(cam, wp, minutes, n, dither, max_step, folder, log=None, target_s=
     print(f"track log: {path}")
 
 
+def find_min(cam, wp, n, log=None, target_s=1.0, coarse=3.0, fine=0.25):
+    """Global search for the rate minimum: sweep the plate a full 90 deg period (both minima of a HWP) in
+    `coarse` steps, then `fine` steps over +/- 1.5 coarse steps around the lowest point, and park there.
+    Use when track-min's local dither cannot bring the rate under the limit (the dip may have moved away)."""
+    if log:
+        log.phase = "find-min"
+    c = wp.position()
+    pts = []
+    for ang in np.arange(c - 45, c + 45 + 1e-9, coarse):
+        a_ = move(wp, ang, log)
+        pts.append((measure(cam, max(1, n // 2), log, target_s)[0], a_))
+        print(f">>> coarse {a_:8.3f} deg: {pts[-1][0] / 1e3:7.1f} kHz", flush=True)
+    best = min(p for p in pts if np.isfinite(p[0]))[1]
+    fpts = []
+    move(wp, best - 1.5 * coarse - 0.5, log)                   # approach the fine scan from below
+    for ang in np.arange(best - 1.5 * coarse, best + 1.5 * coarse + 1e-9, fine):
+        a_ = move(wp, ang, log)
+        fpts.append((measure(cam, n, log, target_s)[0], a_))
+    r, goal = min(p for p in fpts if np.isfinite(p[0]))
+    move(wp, goal - 0.5, log); move(wp, goal, log)
+    print(f">>> find-min: {goal:8.3f} deg  {r / 1e3:7.1f} kHz", flush=True)
+    return goal, r
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--positioner", default="S.Pos2")
@@ -305,6 +330,8 @@ def main(argv=None):
     p.add_argument("--hold", action="store_true")
     p.add_argument("--track-min", action="store_true",
                    help="follow the drifting rate minimum for --minutes (dither +/- --dither deg, parabola step)")
+    p.add_argument("--find-min", action="store_true",
+                   help="global minimum search: full 90 deg sweep, fine 0.25 deg scan at the lowest point, park there")
     p.add_argument("--dither", type=float, default=1.5, help="track-min probe offset (deg)")
     p.add_argument("--step", type=float, default=5.0, help="calibration step (deg)")
     p.add_argument("--span", type=float, default=45.0,
@@ -327,8 +354,8 @@ def main(argv=None):
     p.add_argument("--history-since", default=None,
                    help="rate-vs-time plot covers readings files modified since this ISO time (default: today 00:00)")
     a = p.parse_args(argv)
-    if not (a.measure or a.calibrate or a.hold or a.track_min):
-        p.error("give --measure, --calibrate, --hold and/or --track-min")
+    if not (a.measure or a.calibrate or a.hold or a.track_min or a.find_min):
+        p.error("give --measure, --calibrate, --hold, --track-min and/or --find-min")
 
     wp = xw.Waveplate(a.positioner)
     start, st = wp.position(), wp.initial_status
@@ -353,6 +380,8 @@ def main(argv=None):
             sweep_start = move(wp, a.start_angle, log)
         cal = (calibrate(cam, wp, sweep_start, a.step, a.span, a.readings, folder, log, a.target_s, a.max_rate)
                if a.calibrate else None)
+        if a.find_min:
+            find_min(cam, wp, a.readings, log, a.target_s)
         if a.track_min:
             track_min(cam, wp, a.minutes, a.readings, a.dither, min(a.max_step, 3.0), folder, log,
                       a.target_s, a.max_rate)
@@ -379,7 +408,7 @@ def main(argv=None):
             log.phase = "return"
             move(wp, start, log)
         print(f"{a.positioner} now at {wp.position():.3f} deg")
-        wp.close(disable=was_disabled and not (a.hold or a.track_min))
+        wp.close(disable=was_disabled and not (a.hold or a.track_min or a.find_min))
         log.close()
         since = (datetime.datetime.fromisoformat(a.history_since) if a.history_since
                  else datetime.datetime.combine(datetime.date.today(), datetime.time()))
