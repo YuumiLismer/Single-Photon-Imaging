@@ -31,6 +31,8 @@ p.add_argument("--thr", type=float, default=200)
 p.add_argument("--tag", default="disc")
 p.add_argument("--analyse", nargs="+", default=None)
 p.add_argument("--diode", default=None, help="diode_locate experiment: its frame is the matched filter")
+p.add_argument("--hits-only", type=float, default=None, metavar="ADU",
+               help="save only per-arm hit-count maps (pixels >= ADU above pedestal), not the raw readouts")
 a = p.parse_args()
 
 if not a.analyse:
@@ -44,9 +46,15 @@ if not a.analyse:
             n, d, w = s.split(":")
             if float(w) * 1e-9 * a.acc > ht.MAX_GATE_OPEN_S:
                 sys.exit(f"arm {n}: gate-open time per readout above the safety limit")
-            r = ht.take_run(cam, **{**base, "label": f"{a.tag}_{n}", "gate_delay_ns": float(d), "gate_width_ns": float(w)})
+            r = ht.take_run(cam, save=a.hits_only is None,
+                            **{**base, "label": f"{a.tag}_{n}", "gate_delay_ns": float(d), "gate_width_ns": float(w)})
             if r is None:
                 raise RuntimeError("no readouts")
+            if a.hits_only is not None:                                         # ~1 MB per arm instead of raw frames
+                hit = ht.above_pedestal(r) >= a.hits_only
+                np.savez_compressed(exp / "runs" / f"{ht.run_name(r)}_hits.npz", meta=json.dumps(r["meta"]),
+                                    hits=hit.sum(0).astype(np.uint16), per_readout=hit.sum((1, 2)),
+                                    t=r["t"], thr=a.hits_only)
             if float((r["first"] >= ht.SATURATION_ADU).mean()) > 1e-3:
                 raise RuntimeError("saturation > 0.1%: stopping")
             print(f"  {n} {d}+{w} ns: {ht.readout_interval_s(r):.2f} s/readout", flush=True)
