@@ -860,3 +860,27 @@ Summary: agent_scripts/rate_compare.py (net = arm mean - OFF mean of the templat
   as on Nov 2/3 (33 -> 76 kHz). The 20 kHz limit is only reachable for a few hours after the source is aligned.
 - Next: shrink the fringe pattern on the camera (lens; stripes ~10 px instead of 47) so the photons cover ~20x fewer pixels,
   then a short ON/OFF check and a fringe run in the afternoon while the floor is still < 20 kHz.
+- 2026-11-17 10:40 hold_herald_rate --find-min (new, after the user's "rotate the HWP all the way round"): 32 kHz at 6.0 deg.
+  12:29 after a source tweak (diode removed): floor 62.9 kHz at 8.2 deg.
+- spi60_c1..c34 (12:36-13:45, run at the 35-54 kHz floor on request, ROI 400 at (598, 664)): 850 readouts/arm,
+  net -2.3 +- 3.0 in the Nov 13 beam ellipse: no detection. Readouts are faster at 50 kHz but the per-cycle overhead
+  (track-min, set-up) keeps it at ~750 readout pairs per hour. C: has only ~7 GB free, so raw 400 px stacks
+  (16 MB/cycle) cannot run overnight.
+- disc_ab.py --hits-only ADU (b7b87d0): full-chip readout, saves only the per-arm hit-count maps (~1.3 MB/cycle).
+  spifull_c1..c21 (13:44-14:35, full chip, 23-37 kHz): no spot anywhere. Analysis notes: OFF has ~2 % more hits than ON
+  over the whole chip, so OFF is scaled to ON (not offset), and the remaining ON-OFF has row-wise bands (camera) that are
+  subtracted per row.
+- 1440_agent_snap (diode, gain 1, internal trigger, no lens): beam at the chip centre (545, 520), ~180 x 120 px, 3 fringes;
+  9,500 px above half max. So all the earlier windows did cover it.
+- 14:43-15:30 stray light: after the diode snapshot the diode region had 2x the background in BOTH gates (0.71 vs 0.26 hits/px,
+  fading to baseline by ~15:30): untimed light, not heralded photons. It gave a fake diode-weighted "+65 +- 10" because the
+  ON/OFF background difference dominates; cycles before c10 of spilens are excluded.
+- spilens_c10..c37 (lens back in, full chip, herald held at 12-19 kHz with --hold, 15:27-17:05): 700 ON + 700 OFF readouts.
+  **No spot anywhere on the chip: brightest disk sums are 3.3-3.6 sigma (noise over ~1e6 positions); at the diode position
+  -0.4 +- 0.55 photons/readout (r 10 px). A focused spot (r <= 10 px) holds < ~1.5 photons/readout anywhere, vs ~4.5
+  expected (Nov 2 rate).** Simulation (diode frame, 4.5 photons/readout, 0.3 bg): a 7x-shrunk spot should show by ~250-2,500
+  readouts. So the photons are not reaching the camera inside the 546+31 ns gate.
+- 17:07 the XPS (192.168.0.254) stopped answering (connection timeout); the chain took no data without a rate reading and
+  ended at 20:00.
+- Next: XPS power/network; then a wide-gate timing test (ON 450+300 vs OFF 1450+300) to catch a shifted arrival time;
+  if still empty, check the single-photon fibre coupling and path on the bench.
